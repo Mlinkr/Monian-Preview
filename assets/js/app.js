@@ -1,0 +1,802 @@
+/* ===========================================================
+   莫念 Monian · app.js
+   界面逻辑 / 文件处理 / 导出
+   =========================================================== */
+(function () {
+  'use strict';
+
+  const MN = window.MN;
+  const U = MN.util;
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+  /* ---------------- 状态 ---------------- */
+  const state = MN.store.load();
+  state.files = [];
+  state.template = state.template || null;
+
+  let wmTab = 'per';
+  let fitMode = 'fit'; // fit: 整图可见 / fill: 铺满宽度
+  let guides = false;
+  let loadToken = 0;
+  let rafId = 0;
+
+  const el = {
+    fileCount: $('#fileCount'),
+    dropzone: $('#dropzone'),
+    btnFolder: $('#btnFolder'),
+    btnFiles: $('#btnFiles'),
+    inputFolder: $('#inputFolder'),
+    inputFiles: $('#inputFiles'),
+    progress: $('#progress'),
+    progressBar: $('#progressBar'),
+    progressTxt: $('#progressTxt'),
+    assetInfo: $('#assetInfo'),
+    folderName: $('#folderName'),
+    dateText: $('#dateText'),
+    priceText: $('#priceText'),
+    thumbs: $('#thumbs'),
+    wmTabs: $('#wmTabs'),
+    wmList: $('#wmList'),
+    savedHint: $('#savedHint'),
+    tplDrop: $('#tplDrop'),
+    inputTpl: $('#inputTpl'),
+    tplControls: $('#tplControls'),
+    tplThumb: $('#tplThumb'),
+    tplSize: $('#tplSize'),
+    tplState: $('#tplState'),
+    quickLayout: $('#quickLayout'),
+    cols: $('#cols'),
+    gap: $('#gap'),
+    margin: $('#margin'),
+    radius: $('#radius'),
+    aspect: $('#aspect'),
+    fill: $('#fill'),
+    headerTitle: $('#headerTitle'),
+    headerMeta: $('#headerMeta'),
+    outWidth: $('#outWidth'),
+    outFormat: $('#outFormat'),
+    quality: $('#quality'),
+    qualityRow: $('#qualityRow'),
+    outInfo: $('#outInfo'),
+    stageWrap: $('#stageWrap'),
+    stageCanvas: $('#stageCanvas'),
+    preview: $('#preview'),
+    empty: $('#empty'),
+    stageMeta: $('#stageMeta'),
+  };
+
+  /* ---------------- 保存 ---------------- */
+  function flashSaved() {
+    const h = $('#savedHint');
+    if (!h) return;
+    h.classList.add('show');
+    clearTimeout(flashSaved._t);
+    flashSaved._t = setTimeout(() => h.classList.remove('show'), 1400);
+  }
+
+  const saveDebounced = U.debounce(() => {
+    MN.store.save(state);
+    flashSaved();
+  }, 450);
+
+  function commit(immediateSave) {
+    scheduleRender();
+    updateOutInfo();
+    if (immediateSave) { MN.store.save(state); flashSaved(); }
+    else saveDebounced();
+  }
+
+  /* ---------------- 渲染调度 ---------------- */
+  function scheduleRender() {
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = 0;
+      drawPreview();
+    });
+  }
+
+  function drawPreview() {
+    if (!state.files.length) {
+      el.stageCanvas.hidden = true;
+      el.empty.hidden = false;
+      el.stageMeta.textContent = '等待素材…';
+      return;
+    }
+    el.stageCanvas.hidden = false;
+    el.empty.hidden = true;
+
+    const availW = Math.max(240, el.stageWrap.clientWidth - 48);
+    const availH = Math.max(200, el.stageWrap.clientHeight - 48);
+
+    // 先按导出比例算出预览盒子的显示尺寸，保证整张图一眼可见
+    const probe = MN.Render.layout(1000, state);
+    const ratio = probe.H / probe.W;
+    const isMobile = window.matchMedia('(max-width: 920px)').matches;
+    let displayW = Math.min(availW, 1100);
+    // 适应模式：整图一眼可见；铺满模式：按容器宽度显示，可滚动查看
+    const useFit = !isMobile && fitMode === 'fit';
+    if (useFit && displayW * ratio > availH) displayW = availH / ratio;
+    displayW = Math.max(200, Math.floor(displayW));
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let pxW = Math.max(280, Math.round(displayW * dpr));
+
+    let lay = MN.Render.layout(pxW, state);
+    const budget = 26e6;
+    if (lay.W * lay.H > budget) {
+      pxW = Math.round(pxW * Math.sqrt(budget / (lay.W * lay.H)));
+      lay = MN.Render.layout(pxW, state);
+      displayW = Math.round(displayW * Math.sqrt(budget / (probe.W * probe.H)) * 1.0);
+    }
+
+    const ctx = el.preview.getContext('2d');
+    try {
+      MN.Render.renderTo(ctx, pxW, state, { guides });
+    } catch (e) {
+      console.warn(e);
+      MN.toast('预览渲染失败，图片可能过大');
+      return;
+    }
+
+    el.preview.style.width = displayW + 'px';
+    el.preview.style.height = 'auto';
+
+    const outLay = MN.Render.layout(state.export.width, state);
+    el.stageMeta.textContent =
+      `${state.files.length} 张 · ${lay.cols} 列 · ${outLay.W}×${outLay.H}`;
+  }
+
+  /* ---------------- 输出信息 ---------------- */
+  function updateOutInfo() {
+    if (!state.files.length) {
+      el.outInfo.innerHTML = '<span>添加素材后显示输出尺寸</span>';
+      return;
+    }
+    const lay = MN.Render.layout(state.export.width, state);
+    const megapixel = ((lay.W * lay.H) / 1e6).toFixed(1);
+    const tooBig = lay.H > 16000 || lay.W * lay.H > 120e6;
+    el.outInfo.innerHTML = `
+      <span>输出尺寸 <b>${lay.W} × ${lay.H}</b></span>
+      <span>${megapixel} MP · ${state.files.length} 张</span>
+      <span class="${tooBig ? 'warn' : ''}">${tooBig ? '尺寸过大，建议降低宽度或减少张数' : '尺寸正常'}</span>`;
+  }
+
+  /* ---------------- 缩略图 ---------------- */
+  function renderThumbs() {
+    el.thumbs.innerHTML = state.files
+      .map((f, i) => `<div class="thumb" data-i="${i}">
+        <img src="${f.thumbUrl}" alt="" loading="lazy">
+        <span class="no">${U.pad2(i + 1)}</span>
+        <button type="button" title="移除">×</button>
+      </div>`)
+      .join('');
+    el.fileCount.textContent = `${state.files.length} 张`;
+    el.fileCount.classList.toggle('on', state.files.length > 0);
+    el.assetInfo.hidden = state.files.length === 0;
+    if (state.files.length) {
+      el.folderName.value = state.folderName || '';
+      el.dateText.value = state.dateText || '';
+      el.priceText.value = state.priceText || '';
+    }
+  }
+
+  el.thumbs.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const card = btn.closest('.thumb');
+    const i = +card.dataset.i;
+    const f = state.files[i];
+    if (f && f.thumbUrl) URL.revokeObjectURL(f.thumbUrl);
+    state.files.splice(i, 1);
+    renderThumbs();
+    commit();
+  });
+
+  /* ---------------- 文件读取 ---------------- */
+  function showProgress(done, total) {
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    el.progress.hidden = false;
+    el.progressBar.style.width = pct + '%';
+    el.progressTxt.textContent = `${done} / ${total}`;
+  }
+
+  async function handleFiles(fileList, source) {
+    const arr = Array.from(fileList || []).filter(U.isImage);
+    if (!arr.length) { MN.toast('没有找到可用的图片文件'); return; }
+
+    const token = ++loadToken;
+
+    // 清理旧图
+    state.files.forEach((f) => f.thumbUrl && URL.revokeObjectURL(f.thumbUrl));
+    state.files = [];
+
+    // 文件夹名
+    if (source === 'folder') {
+      const p = (arr[0].webkitRelativePath || '').split('/');
+      if (p.length > 1 && p[0]) {
+        state.folderName = p[0];
+      } else {
+        // 部分手机浏览器选了文件夹也拿不到路径，退回用文件名
+        state.folderName = arr[0].name.replace(/\.[^.]+$/, '');
+        MN.toast('未读取到文件夹名，已用文件名代替，可在上方修改', 3000);
+      }
+    } else if (!state.folderName) {
+      state.folderName = arr[0].name.replace(/\.[^.]+$/, '') || '素材预览';
+    }
+
+    // 时间：取文件最新修改时间
+    const times = arr.map((f) => f.lastModified).filter((t) => t > 0);
+    if (times.length) state.dateText = U.fmtDate(Math.max(...times));
+    if (!state.dateText) state.dateText = U.fmtDate(Date.now());
+
+    // 排序
+    arr.sort((a, b) => U.collator.compare(a.name, b.name));
+
+    const limit = 80;
+    const list = arr.slice(0, limit);
+    if (arr.length > limit) MN.toast(`一次最多 ${limit} 张，已截取前 ${limit} 张`, 3200);
+
+    showProgress(0, list.length);
+    el.progress.hidden = false;
+
+    for (let i = 0; i < list.length; i++) {
+      if (token !== loadToken) return;
+      const file = list[i];
+      try {
+        const r = await MN.loadBitmap(file, 2600);
+        state.files.push({
+          id: U.uid(),
+          file,
+          name: file.name,
+          img: r.img,
+          w: r.w,
+          h: r.h,
+          thumbUrl: URL.createObjectURL(file),
+        });
+      } catch (err) {
+        console.warn('跳过无法解析的图片：', file.name, err);
+      }
+      showProgress(i + 1, list.length);
+      if (i % 3 === 0) await new Promise((r) => setTimeout(r, 0));
+    }
+
+    el.progress.hidden = true;
+    if (token !== loadToken) return;
+
+    if (!state.files.length) {
+      MN.toast('图片解析失败，请换成 JPG / PNG 格式（HEIC 需先转换）', 3600);
+      return;
+    }
+    renderThumbs();
+    commit(true);
+    MN.toast(`已载入 ${state.files.length} 张图片`);
+  }
+
+  /* ---------------- 上传交互 ---------------- */
+  el.btnFolder.addEventListener('click', () => el.inputFolder.click());
+  el.btnFiles.addEventListener('click', () => el.inputFiles.click());
+  el.dropzone.addEventListener('click', (e) => {
+    if (e.target.closest('button')) return;
+    el.inputFolder.click();
+  });
+
+  el.inputFolder.addEventListener('change', (e) => {
+    if (e.target.files.length) handleFiles(e.target.files, 'folder');
+    e.target.value = '';
+  });
+  el.inputFiles.addEventListener('change', (e) => {
+    if (e.target.files.length) handleFiles(e.target.files, 'files');
+    e.target.value = '';
+  });
+
+  // 拖拽
+  ['dragenter', 'dragover'].forEach((ev) =>
+    el.dropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      el.dropzone.classList.add('hot');
+    })
+  );
+  ['dragleave', 'drop'].forEach((ev) =>
+    el.dropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      el.dropzone.classList.remove('hot');
+    })
+  );
+  el.dropzone.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    if (dt && dt.files && dt.files.length) handleFiles(dt.files, 'files');
+  });
+
+  // 素材信息
+  el.folderName.addEventListener('input', () => {
+    state.folderName = el.folderName.value;
+    commit();
+  });
+  el.dateText.addEventListener('input', () => {
+    state.dateText = el.dateText.value;
+    commit();
+  });
+  el.priceText.addEventListener('input', () => {
+    state.priceText = el.priceText.value;
+    commit();
+  });
+
+  /* ---------------- 水印列表 ---------------- */
+  const ANCHORS = [
+    ['tl', '左上'], ['tc', '上中'], ['tr', '右上'],
+    ['ml', '左中'], ['mc', '正中'], ['mr', '右中'],
+    ['bl', '左下'], ['bc', '下中'], ['br', '右下'],
+  ];
+
+  function wmListRef() {
+    return wmTab === 'per' ? state.wmPer : state.wmGlobal;
+  }
+
+  function renderWmList() {
+    const list = wmListRef();
+    if (!list.length) {
+      el.wmList.innerHTML = `<div class="wm-empty">暂无水印，点下方按钮添加</div>`;
+      return;
+    }
+    el.wmList.innerHTML = list
+      .map((it, i) => `
+      <div class="wm-item" data-i="${i}">
+        <div class="wm-item-top">
+          <input type="text" class="wm-text" value="${U.esc(it.text)}" placeholder="输入水印文字，可用占位符">
+          <button class="wm-del" type="button" title="删除">×</button>
+        </div>
+        <div class="wm-item-bot">
+          <select class="wm-anchor">
+            ${ANCHORS.map(([v, t]) => `<option value="${v}"${it.anchor === v ? ' selected' : ''}>${t}</option>`).join('')}
+          </select>
+          <div class="wm-slide"><span>字号</span><input type="range" class="wm-size" min="0.5" max="2.6" step="0.05" value="${it.size || 1}"></div>
+          <div class="wm-slide"><span>透明</span><input type="range" class="wm-op" min="0.05" max="1" step="0.05" value="${it.opacity == null ? 0.9 : it.opacity}"></div>
+        </div>
+      </div>`)
+      .join('');
+  }
+
+  el.wmTabs.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    wmTab = b.dataset.tab;
+    $$('button', el.wmTabs).forEach((x) => x.classList.toggle('on', x === b));
+    renderWmList();
+  });
+
+  el.wmList.addEventListener('input', (e) => {
+    const item = e.target.closest('.wm-item');
+    if (!item) return;
+    const list = wmListRef();
+    const it = list[+item.dataset.i];
+    if (!it) return;
+    if (e.target.classList.contains('wm-text')) it.text = e.target.value;
+    else if (e.target.classList.contains('wm-size')) it.size = +e.target.value;
+    else if (e.target.classList.contains('wm-op')) it.opacity = +e.target.value;
+    else return;
+    commit();
+  });
+
+  el.wmList.addEventListener('change', (e) => {
+    if (!e.target.classList.contains('wm-anchor')) return;
+    const item = e.target.closest('.wm-item');
+    const list = wmListRef();
+    const it = list[+item.dataset.i];
+    if (!it) return;
+    it.anchor = e.target.value;
+    commit(true);
+  });
+
+  el.wmList.addEventListener('click', (e) => {
+    if (!e.target.classList.contains('wm-del')) return;
+    const item = e.target.closest('.wm-item');
+    wmListRef().splice(+item.dataset.i, 1);
+    renderWmList();
+    commit(true);
+  });
+
+  $('#btnWmAdd').addEventListener('click', () => {
+    wmListRef().push({
+      id: U.uid(),
+      text: wmTab === 'per' ? '{folder}' : '莫念 MONIAN',
+      anchor: wmTab === 'per' ? 'tl' : 'bc',
+      size: 1,
+      opacity: 0.85,
+      weight: 400,
+    });
+    renderWmList();
+    commit(true);
+  });
+
+  $('#btnWmDefault').addEventListener('click', () => {
+    const d = MN.store.defaultState();
+    if (wmTab === 'per') state.wmPer = d.wmPer;
+    else state.wmGlobal = d.wmGlobal;
+    renderWmList();
+    commit(true);
+    MN.toast('已恢复推荐水印配置');
+  });
+
+  $('#btnWmClear').addEventListener('click', () => {
+    if (wmTab === 'per') state.wmPer = [];
+    else state.wmGlobal = [];
+    renderWmList();
+    commit(true);
+    MN.toast('已清空，可重新输入');
+  });
+
+  /* ---------------- 模板 ---------------- */
+  el.tplDrop.addEventListener('click', () => el.inputTpl.click());
+
+  el.inputTpl.addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    await applyTemplate(f);
+  });
+
+  async function applyTemplate(file) {
+    try {
+      const r = await MN.loadBitmap(file, 3000);
+      const prevPad = (state.template && state.template.pad) || { t: 20, r: 4, b: 12, l: 4 };
+      state.template = {
+        aspect: r.w / r.h,
+        pad: Object.assign({}, prevPad),
+        img: r.img,
+        w: r.w,
+        h: r.h,
+      };
+      await MN.idb.set('template', file);
+      syncTemplateUI();
+      commit(true);
+      MN.toast('模板已应用');
+    } catch (err) {
+      MN.toast('模板图片无法解析，请换成 JPG / PNG');
+    }
+  }
+
+  function syncTemplateUI() {
+    const t = state.template;
+    const has = !!(t && t.img);
+    el.tplControls.hidden = !has;
+    el.tplState.textContent = has ? '已启用' : '未使用';
+    el.tplState.classList.toggle('on', has);
+    el.tplDrop.hidden = has;
+    if (has) {
+      if (!el.tplThumb.src) {
+        // 用 canvas 生成小预览，避免再存一份 URL
+        const c = document.createElement('canvas');
+        c.width = 108; c.height = 108;
+        const cx = c.getContext('2d');
+        cx.fillStyle = '#0b0b0f';
+        cx.fillRect(0, 0, 108, 108);
+        const s = Math.min(108 / t.w, 108 / t.h);
+        const dw = t.w * s, dh = t.h * s;
+        cx.drawImage(t.img, (108 - dw) / 2, (108 - dh) / 2, dw, dh);
+        el.tplThumb.src = c.toDataURL('image/jpeg', 0.8);
+      }
+      el.tplSize.textContent = `${t.w} × ${t.h} · ${t.aspect.toFixed(2)}:1`;
+      setSlider('#padT', t.pad.t);
+      setSlider('#padR', t.pad.r);
+      setSlider('#padB', t.pad.b);
+      setSlider('#padL', t.pad.l);
+    } else {
+      el.tplThumb.removeAttribute('src');
+    }
+  }
+
+  $('#btnTplRemove').addEventListener('click', async () => {
+    state.template = null;
+    await MN.idb.del('template');
+    syncTemplateUI();
+    commit(true);
+    MN.toast('已移除模板');
+  });
+
+  [['#padT', 't'], ['#padR', 'r'], ['#padB', 'b'], ['#padL', 'l']].forEach(([sel, key]) => {
+    const input = $(sel);
+    input.addEventListener('input', () => {
+      if (!state.template) return;
+      state.template.pad[key] = +input.value;
+      syncOutputOfSlider(input);
+      commit();
+    });
+  });
+
+  $('#showGuides').addEventListener('change', (e) => {
+    guides = e.target.checked;
+    scheduleRender();
+  });
+
+  // 从 IndexedDB 恢复模板
+  (async function restoreTemplate() {
+    if (!state.template) return;
+    const blob = await MN.idb.get('template');
+    if (!blob) { state.template = null; return; }
+    try {
+      const r = await MN.loadBitmap(blob, 3000);
+      state.template.img = r.img;
+      state.template.w = r.w;
+      state.template.h = r.h;
+      state.template.aspect = r.w / r.h;
+      syncTemplateUI();
+      scheduleRender();
+    } catch (e) { state.template = null; }
+  })();
+
+  /* ---------------- 版式控件 ---------------- */
+  const sliderDefs = [
+    ['#cols', 'cols', (v) => `${v} 列`],
+    ['#gap', 'gap', (v) => v.toFixed(1) + '%'],
+    ['#margin', 'margin', (v) => v.toFixed(1) + '%'],
+    ['#radius', 'radius', (v) => v.toFixed(2)],
+    ['#quality', null, (v) => Math.round(v * 100) + '%'],
+    ['#padT', null, (v) => v + '%'],
+    ['#padR', null, (v) => v + '%'],
+    ['#padB', null, (v) => v + '%'],
+    ['#padL', null, (v) => v + '%'],
+  ];
+
+  function syncOutputOfSlider(input) {
+    const out = input.parentElement.querySelector('output');
+    if (!out) return;
+    const def = sliderDefs.find((d) => d[0] === '#' + input.id);
+    out.textContent = def ? def[2](+input.value) : input.value;
+  }
+
+  function setSlider(sel, val) {
+    const input = $(sel);
+    if (!input) return;
+    input.value = val;
+    syncOutputOfSlider(input);
+  }
+
+  $('#cols').addEventListener('input', (e) => {
+    state.layout.cols = +e.target.value;
+    syncOutputOfSlider(e.target);
+    syncQuickLayout();
+    commit();
+  });
+  ['gap', 'margin', 'radius'].forEach((k) => {
+    $('#' + k).addEventListener('input', (e) => {
+      state.layout[k] = +e.target.value;
+      syncOutputOfSlider(e.target);
+      commit();
+    });
+  });
+  $('#quality').addEventListener('input', (e) => {
+    state.export.quality = +e.target.value;
+    syncOutputOfSlider(e.target);
+    saveDebounced();
+  });
+
+  el.quickLayout.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    state.layout.cols = +b.dataset.cols;
+    setSlider('#cols', state.layout.cols);
+    syncQuickLayout();
+    commit(true);
+  });
+
+  function syncQuickLayout() {
+    $$('button', el.quickLayout).forEach((b) => {
+      b.classList.toggle('on', +b.dataset.cols === +state.layout.cols);
+    });
+  }
+
+  el.aspect.addEventListener('change', () => {
+    state.layout.aspect = el.aspect.value;
+    commit(true);
+  });
+
+  el.fill.addEventListener('change', () => {
+    state.layout.fill = el.fill.value;
+    commit(true);
+  });
+
+  el.headerTitle.addEventListener('input', () => {
+    state.header.title = el.headerTitle.value;
+    commit();
+  });
+  el.headerMeta.addEventListener('input', () => {
+    state.header.meta = el.headerMeta.value;
+    commit();
+  });
+
+  el.outWidth.addEventListener('change', () => {
+    state.export.width = +el.outWidth.value;
+    updateOutInfo();
+    saveDebounced();
+  });
+  el.outFormat.addEventListener('change', () => {
+    state.export.format = el.outFormat.value;
+    el.qualityRow.style.display = state.export.format === 'png' ? 'none' : 'flex';
+    saveDebounced();
+  });
+
+  /* ---------------- 初始化控件 ---------------- */
+  function syncUI() {
+    el.folderName.value = state.folderName || '';
+    el.dateText.value = state.dateText || '';
+    el.priceText.value = state.priceText || '';
+    el.headerTitle.value = state.header.title || '';
+    el.headerMeta.value = state.header.meta || '';
+    setSlider('#cols', state.layout.cols);
+    setSlider('#gap', state.layout.gap);
+    setSlider('#margin', state.layout.margin);
+    setSlider('#radius', state.layout.radius);
+    setSlider('#quality', state.export.quality);
+    el.aspect.value = String(state.layout.aspect);
+    el.fill.value = state.layout.fill || 'cover';
+    el.outWidth.value = String(state.export.width);
+    el.outFormat.value = state.export.format;
+    el.qualityRow.style.display = state.export.format === 'png' ? 'none' : 'flex';
+    syncQuickLayout();
+    renderWmList();
+    syncTemplateUI();
+    renderThumbs();
+    updateOutInfo();
+  }
+
+  /* ---------------- 导出 ---------------- */
+  let exporting = false;
+
+  async function buildCanvas(W) {
+    const ctxCanvas = document.createElement('canvas');
+    const lay = MN.Render.layout(W, state);
+    if (lay.H > 16384) throw new Error('too-tall');
+    if (lay.W * lay.H > 130e6) throw new Error('too-big');
+    ctxCanvas.width = lay.W;
+    ctxCanvas.height = lay.H;
+    const ctx = ctxCanvas.getContext('2d');
+    MN.Render.paint(ctx, lay, state, { guides: false });
+    return { canvas: ctxCanvas, lay };
+  }
+
+  function toBlob(canvas, type, quality) {
+    return new Promise((resolve, reject) => {
+      if (canvas.toBlob) {
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('blob'))), type, quality);
+      } else {
+        try {
+          const data = canvas.toDataURL(type, quality);
+          const bin = atob(data.split(',')[1]);
+          const arr = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          resolve(new Blob([arr], { type }));
+        } catch (e) { reject(e); }
+      }
+    });
+  }
+
+  function fileName(ext) {
+    const base = (state.folderName || '莫念预览').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40);
+    const d = new Date();
+    const stamp = `${d.getFullYear()}${U.pad2(d.getMonth() + 1)}${U.pad2(d.getDate())}`;
+    return `${base}_${state.layout.cols}列_${stamp}.${ext}`;
+  }
+
+  async function exportImage() {
+    if (!state.files.length) { MN.toast('请先添加素材'); return; }
+    if (exporting) return;
+    exporting = true;
+    const btn = $('#btnExport');
+    const btn2 = $('#btnExport2');
+    const oldTxt = btn.textContent;
+    btn.textContent = '生成中…';
+    btn.disabled = btn2.disabled = true;
+
+    try {
+      const W = state.export.width;
+      const { canvas, lay } = await buildCanvas(W);
+      const isPng = state.export.format === 'png';
+      const type = isPng ? 'image/png' : 'image/jpeg';
+      const blob = await toBlob(canvas, type, isPng ? undefined : state.export.quality);
+
+      const name = fileName(isPng ? 'png' : 'jpg');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+      MN.toast(`已生成 ${lay.W}×${lay.H} · ${U.bytes(blob.size)}`, 3200);
+    } catch (err) {
+      console.error(err);
+      if (err && err.message === 'too-tall') MN.toast('图片太长，请降低输出宽度或减少图片数量', 3600);
+      else if (err && err.message === 'too-big') MN.toast('尺寸过大，请降低输出宽度', 3600);
+      else MN.toast('生成失败，请降低输出宽度后重试', 3600);
+    } finally {
+      exporting = false;
+      btn.textContent = oldTxt === '生成中…' ? '导出图片' : oldTxt;
+      btn.disabled = btn2.disabled = false;
+    }
+  }
+
+  $('#btnFit').addEventListener('click', () => {
+    fitMode = fitMode === 'fit' ? 'fill' : 'fit';
+    $('#btnFit').textContent = fitMode === 'fit' ? '铺满' : '适应';
+    try { localStorage.setItem('monian.fit', fitMode); } catch (e) {}
+    scheduleRender();
+  });
+
+  try {
+    const f = localStorage.getItem('monian.fit');
+    if (f === 'fill' || f === 'fit') {
+      fitMode = f;
+      $('#btnFit').textContent = fitMode === 'fit' ? '铺满' : '适应';
+    }
+  } catch (e) {}
+
+  $('#btnExport').addEventListener('click', exportImage);
+  $('#btnExport2').addEventListener('click', exportImage);
+
+  $('#btnCopy').addEventListener('click', async () => {
+    if (!state.files.length) { MN.toast('请先添加素材'); return; }
+    try {
+      if (!navigator.clipboard || !window.ClipboardItem) throw new Error('unsupported');
+      const { canvas } = await buildCanvas(state.export.width);
+      const blob = await toBlob(canvas, 'image/png');
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      MN.toast('已复制到剪贴板');
+    } catch (e) {
+      MN.toast('当前浏览器不支持复制，请用「导出图片」', 2800);
+    }
+  });
+
+  /* ---------------- 重置 / 说明 ---------------- */
+  $('#btnResetAll').addEventListener('click', () => {
+    if (!confirm('确定要清空所有素材与设置吗？（水印文字也会重置）')) return;
+    MN.store.clear();
+    MN.idb.del('template');
+    const d = MN.store.defaultState();
+    Object.keys(d).forEach((k) => { state[k] = d[k]; });
+    state.files.forEach((f) => f.thumbUrl && URL.revokeObjectURL(f.thumbUrl));
+    state.files = [];
+    state.template = null;
+    el.tplThumb.removeAttribute('src');
+    syncUI();
+    scheduleRender();
+    MN.toast('已重置');
+  });
+
+  $('#btnGuide').addEventListener('click', () => { $('#guideModal').hidden = false; });
+  $('#btnGuideClose').addEventListener('click', () => { $('#guideModal').hidden = true; });
+  $('#guideModal').addEventListener('click', (e) => {
+    if (e.target.id === 'guideModal') e.target.hidden = true;
+  });
+
+  // 快捷键
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      e.preventDefault();
+      exportImage();
+    }
+  });
+
+  // 窗口尺寸变化
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(scheduleRender, 180);
+  });
+
+  /* ---------------- 启动 ---------------- */
+  const supportsDir = 'webkitdirectory' in document.createElement('input');
+  if (!supportsDir) {
+    el.btnFolder.style.display = 'none';
+    $('.dz-title').textContent = '点击选择图片，或直接拖入';
+    $('.dz-sub').textContent = '当前浏览器不支持选文件夹，选择图片后请手动填写素材名称';
+  }
+
+  syncUI();
+  scheduleRender();
+
+  // 暴露给调试
+  MN.state = state;
+})();
