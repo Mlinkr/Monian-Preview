@@ -639,7 +639,8 @@
       return;
     }
     try {
-      const r = await MN.loadBitmap(file, 2000);
+      // 不限制水印图片尺寸，原尺寸读入（仅超大图保险降到 10000px）
+      const r = await MN.loadBitmap(file, 10000);
       // 16:9 的图（与素材比例一致）→ 自动自适应铺满每个格子；其他比例按可调方式处理
       const ratio = r.w / r.h;
       const fitCell = Math.abs(ratio - 16 / 9) < 0.04;
@@ -712,16 +713,21 @@
     ['count', '张数水印', '跟「张数」联动，支持占位符'],
   ];
 
+  const AUTO_DEFAULT_TEXT = { folder: '{folder}', date: '{date}', count: '{count}' };
+
   function autoWmRef(key) {
-    if (!state.autoWm[key]) state.autoWm[key] = { on: false, anchor: 'bl', size: 1, opacity: 0.9, weight: 400, color: '#ffffff', dx: 0, dy: 0 };
+    if (!state.autoWm[key]) state.autoWm[key] = { on: false, text: AUTO_DEFAULT_TEXT[key], anchor: 'bl', size: 1, opacity: 0.9, weight: 400, color: '#ffffff', dx: 0, dy: 0 };
+    if (state.autoWm[key].text == null) state.autoWm[key].text = AUTO_DEFAULT_TEXT[key];
     return state.autoWm[key];
   }
 
   function renderAutoWm() {
     const box = document.getElementById('autoWmBox');
     if (!box) return;
+    const AUTO_PH = { folder: '{folder}，跟「素材名称」联动', date: '{date}，跟「日期」联动', count: '{count}，跟「张数」联动' };
     box.innerHTML = AUTO_KEYS.map(([key, label]) => {
       const a = autoWmRef(key);
+      const ph = AUTO_PH[key];
       return `
       <div class="auto-row" data-key="${key}">
         <div class="auto-row-top">
@@ -730,6 +736,9 @@
           <select class="aw-anchor">
             ${ANCHORS.map(([v, t]) => `<option value="${v}"${a.anchor === v ? ' selected' : ''}>${t}</option>`).join('')}
           </select>
+        </div>
+        <div class="auto-row-mid"${a.on ? '' : ' hidden'}>
+          <input type="text" class="aw-text" value="${U.esc(a.text || '')}" placeholder="${ph}">
         </div>
         <div class="auto-row-bot"${a.on ? '' : ' hidden'}>
           <div class="wm-slide"><span>字号</span><input type="range" class="aw-size" min="0.4" max="2.6" step="0.05" value="${a.size || 1}"><output>${(a.size || 1).toFixed(2)}</output></div>
@@ -769,6 +778,8 @@
         if (o) o.textContent = Math.round(+e.target.value * 100) + '%';
       } else if (e.target.classList.contains('aw-color')) {
         a.color = e.target.value;
+      } else if (e.target.classList.contains('aw-text')) {
+        a.text = e.target.value;
       } else return;
       commit();
     });

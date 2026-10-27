@@ -461,19 +461,21 @@
   }
 
   /* ---------------- 01 自动水印（名称 / 日期 / 张数） ---------------- */
-  function autoItems(st) {
+  function autoItems(st, vars) {
     const A = st.autoWm || {};
     const out = [];
-    const mk = (key, text) => {
+    const mk = (key, fallback) => {
       const a = A[key];
       if (!a || !a.on) return;
-      const t = String(text == null ? '' : text).trim();
+      // 默认占位符（如 {folder}），用户可改成任意文字，同样走占位符替换
+      const raw = a.text == null || String(a.text).trim() === '' ? fallback : a.text;
+      const t = subst(raw, vars || {}).trim();
       if (!t) return;
       out.push({ kind: 'text', text: t, anchor: a.anchor || 'bl', size: a.size || 1, opacity: a.opacity == null ? 0.9 : a.opacity, weight: a.weight || 400, color: a.color || '#ffffff', dx: a.dx || 0, dy: a.dy || 0 });
     };
-    mk('folder', st.folderName);
-    mk('date', st.dateText);
-    mk('count', st.countText);
+    mk('folder', '{folder}');
+    mk('date', '{date}');
+    mk('count', '{count}');
     return out;
   }
 
@@ -496,7 +498,7 @@
 
     // 每张图
     const n = st.files.length;
-    const hasTextWm = autoItems(st).length > 0 ||
+    const hasTextWm = autoItems(st, { folder: st.folderName, date: st.dateText, count: n }).length > 0 ||
       (st.wmPer || []).some((w) => !isImageItem(w) && w.text && w.text.trim());
     for (const cell of lay.cells) {
       const f = st.files[cell.i];
@@ -537,7 +539,7 @@
         index: `${U.pad2(cell.i + 1)}/${U.pad2(n)}`,
         count: n,
       };
-      drawWatermarkGroup(ctx, autoItems(st).concat(st.wmPer || []), cell, cell.w * 0.042, vars, 1.5);
+      drawWatermarkGroup(ctx, autoItems(st, vars).concat(st.wmPer || []), cell, cell.w * 0.042, vars, 1.5);
       ctx.restore();
 
       // 细边框
