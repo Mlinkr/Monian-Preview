@@ -14,8 +14,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="拼图预览">
-<link rel="stylesheet" href="assets/fonts/font.css?v=1">
-<link rel="stylesheet" href="assets/css/style.css?v=7">
+<link rel="stylesheet" href="assets/fonts/font.css?v=2">
+<link rel="stylesheet" href="assets/css/style.css?v=8">
 </head>
 <body>
 
@@ -86,7 +86,12 @@
           <button data-tab="global" type="button">整张图上</button>
         </div>
         <div class="wm-list" id="wmList"></div>
-        <button class="btn btn-ghost full" id="btnWmAdd" type="button">＋ 添加一条水印</button>
+        <div class="wm-add-row">
+          <button class="btn btn-ghost" id="btnWmAdd" type="button">＋ 添加文字水印</button>
+          <button class="btn btn-ghost" id="btnWmImg" type="button">＋ 添加花纹图</button>
+        </div>
+        <input type="file" id="inputWmImg" accept="image/png,image/webp,image/*" hidden>
+        <p class="tip">花纹图用 PNG 透明底（半透明条纹、水印图案），会自动平铺在图片上，可调尺寸与透明度。</p>
         <p class="tip">支持占位符：<code>{folder}</code> 名称 · <code>{date}</code> 时间 · <code>{index}</code> 序号 · <code>{count}</code> 张数</p>
         <div class="wm-foot">
           <button class="link" id="btnWmDefault" type="button">恢复推荐配置</button>
@@ -184,26 +189,11 @@
         <div class="slider-row"><label>四周留白</label><input type="range" id="margin" min="0" max="10" step="0.5"><output></output></div>
         <div class="slider-row"><label>圆角</label><input type="range" id="radius" min="0" max="2" step="0.05"><output></output></div>
 
-        <div class="row">
-          <label for="aspect">图片比例</label>
-          <select id="aspect">
-            <option value="auto">跟随原图</option>
-            <option value="0.75">3 : 4 竖图</option>
-            <option value="1">1 : 1 方形</option>
-            <option value="1.3333">4 : 3 横图</option>
-            <option value="0.5625">9 : 16 长竖图</option>
-            <option value="1.7778">16 : 9 宽屏</option>
-            <option value="0.6667">2 : 3</option>
-          </select>
+        <div class="fixed-note">
+          <b>16 : 9 固定</b>
+          <span>所有素材按 16:9 单元格完整显示，等比缩放不裁剪、不拉伸</span>
         </div>
-        <div class="row">
-          <label for="fill">填充方式</label>
-          <select id="fill">
-            <option value="cover">填满格子（整齐，可能裁剪）</option>
-            <option value="contain">保持比例（不裁剪，留白）</option>
-          </select>
-        </div>
-        <label class="check"><input type="checkbox" id="lastRowFill"><span>末行不满格时铺满整行（否则居中保持原大小）</span></label>
+        <label class="check"><input type="checkbox" id="lastRowFill"><span>末行不满格时铺满整行（等比放大，比例不变）</span></label>
       </div>
     </section>
 
@@ -293,8 +283,8 @@
   </div>
 </div>
 
-<script src="assets/js/core.js?v=6"></script>
-<script src="assets/js/render.js?v=6"></script>
-<script src="assets/js/app.js?v=6"></script>
+<script src="assets/js/core.js?v=7"></script>
+<script src="assets/js/render.js?v=7"></script>
+<script src="assets/js/app.js?v=7"></script>
 </body>
 </html>

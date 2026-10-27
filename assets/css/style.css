@@ -29,7 +29,7 @@ body{
   margin:0;
   background:var(--bg);
   color:var(--txt);
-  font-family:"LXGW WenKai","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+  font-family:"Monian Serif","Noto Serif SC","Source Han Serif SC","Songti SC",serif;
   font-size:14px;
   line-height:1.55;
   -webkit-font-smoothing:antialiased;
@@ -583,3 +583,27 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:5px}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
 }
+
+/* ---- 图片（花纹）水印 ---- */
+.wm-add-row{display:flex;gap:8px}
+.wm-add-row .btn{flex:1;min-width:0}
+.wm-item.is-img{border-color:rgba(216,177,117,.22)}
+.wm-img-top{gap:8px}
+.wm-img-thumb{width:34px;height:22px;object-fit:contain;border-radius:4px;background:
+  linear-gradient(45deg,rgba(255,255,255,.08) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.08) 75%) 0 0/8px 8px,
+  #16161c;flex:none}
+.wm-img-name{flex:1;min-width:0;font-size:11.5px;color:var(--dim-2, #9a9aa6);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wm-img-row{gap:6px}
+.wm-img-row2{gap:10px;margin-top:4px}
+.wm-img-row3{margin-top:4px;gap:6px}
+.wm-mini{font-size:10px;color:var(--dim-2);flex:none}
+.wm-inline{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dim-2);flex:1;min-width:0}
+.wm-inline input[type=range]{flex:1;min-width:0;height:16px}
+.wm-inline output{font-size:10px;min-width:22px;text-align:right;color:var(--dim-2)}
+
+/* 16:9 固定说明 */
+.fixed-note{display:flex;align-items:center;gap:8px;margin:10px 0 6px;padding:8px 10px;
+  border:1px solid rgba(216,177,117,.22);border-radius:8px;background:rgba(216,177,117,.06);font-size:11.5px}
+.fixed-note b{flex:none;color:#d8b175;font-size:12px;letter-spacing:.02em}
+.fixed-note span{color:var(--dim-2);line-height:1.5}

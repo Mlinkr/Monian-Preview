@@ -61,9 +61,12 @@
     folderName: '',
     dateText: '',
     priceText: '',
+    // 水印条目有两种 kind：
+    //   text  —— { text, anchor, size, opacity, weight, color, free, px, py, dx, dy }
+    //   image —— { kind:'image', img(内存), name, mode:'tile'|'single', opacity, scale, tile, anchor, ... }
     wmPer: [
-      { id: 'd1', text: '{folder}', anchor: 'bl', size: 1.35, opacity: 0.95, weight: 600, color: '#ffffff' },
-      { id: 'd2', text: '{date}', anchor: 'bl', size: 0.85, opacity: 0.72, weight: 400, color: '#ffffff' },
+      { id: 'd1', kind: 'text', text: '{folder}', anchor: 'bl', size: 1.35, opacity: 0.95, weight: 600, color: '#ffffff' },
+      { id: 'd2', kind: 'text', text: '{date}', anchor: 'bl', size: 0.85, opacity: 0.72, weight: 400, color: '#ffffff' },
     ],
     wmGlobal: [],
     header: {

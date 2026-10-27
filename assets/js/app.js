@@ -58,7 +58,6 @@
     gap: $('#gap'),
     margin: $('#margin'),
     radius: $('#radius'),
-    aspect: $('#aspect'),
     fill: $('#fill'),
     lastRowFill: $('#lastRowFill'),
     headerTitle: $('#headerTitle'),
@@ -272,6 +271,9 @@
       state.dateText = times.length ? U.fmtDate(Math.max(...times)) : U.fmtDate(Date.now());
     }
 
+    // 把提取出来的名称 / 日期直接落成文字水印（默认只补缺失的那几条，不覆盖用户已有编辑）
+    ensureAutoWm();
+
     // 排序
     arr.sort((a, b) => U.collator.compare(a.webkitRelativePath || a.name, b.webkitRelativePath || b.name));
 
@@ -360,6 +362,43 @@
     commit();
   });
 
+  /* ---------------- 自动水印：把提取到的名称/日期落成文字水印 ---------------- */
+  // 规则：只补齐缺失的那一条，绝不覆盖用户已经改过的样式；
+  // 若用户手动删掉了某条，记录在 wmSuppressed 里，不再自动加回来。
+  function ensureAutoWm() {
+    const want = [];
+    if ((state.folderName || '').trim()) want.push({ key: 'folder', text: '{folder}' });
+    if ((state.dateText || '').trim()) want.push({ key: 'date', text: '{date}' });
+
+    const has = (ph) => state.wmPer.some((it) => {
+      if (!it || it.kind === 'image') return false;
+      return String(it.text || '').indexOf(ph) >= 0;
+    });
+
+    let added = 0;
+    want.forEach((w, i) => {
+      if (has(w.text)) return;
+      if ((state.wmSuppressed || []).indexOf(w.key) >= 0) return;
+      state.wmPer.push({
+        id: U.uid(),
+        kind: 'text',
+        text: w.text,
+        anchor: 'bl',
+        size: i === 0 ? 1.15 : 0.8,
+        opacity: i === 0 ? 0.95 : 0.7,
+        weight: i === 0 ? 600 : 400,
+        color: '#ffffff',
+        auto: true,
+      });
+      added++;
+    });
+    if (added) renderWmList();
+    return added;
+  }
+
+  // 供「恢复推荐配置」调用：带上当前的名称/日期
+  MN.ensureAutoWm = ensureAutoWm;
+
   /* ---------------- 水印列表 ---------------- */
   const ANCHORS = [
     ['tl', '左上'], ['tc', '上中'], ['tr', '右上'],
@@ -378,6 +417,9 @@
     return (n > 0 ? '+' : '') + n + '%';
   }
 
+  // 水印条目：kind='text'（文字）或 kind='image'（PNG 图）
+  function isImg(it) { return it && it.kind === 'image'; }
+
   function renderWmList() {
     const list = wmListRef();
     if (!list.length) {
@@ -392,21 +434,61 @@
         const px = it.px == null ? 8 : +it.px;
         const py = it.py == null ? 92 : +it.py;
         const open = wmPosOpen.has(it.id);
+        const op = it.opacity == null ? (isImg(it) ? 0.18 : 0.9) : it.opacity;
+        const opPct = Math.round(op * 100) + '%';
+
+        // 图片水印：顶部显示缩略图 + 文件名
+        const head = isImg(it)
+          ? `<div class="wm-item-top wm-img-top">
+               <img class="wm-img-thumb" src="${it.thumbUrl || it.src || ''}" alt="">
+               <span class="wm-img-name">${U.esc(it.name || '花纹 PNG')}</span>
+               <button class="wm-del" type="button" title="删除">×</button>
+             </div>`
+          : `<div class="wm-item-top">
+               <input type="text" class="wm-text" value="${U.esc(it.text || '')}" placeholder="输入水印文字，可用占位符">
+               <button class="wm-del" type="button" title="删除">×</button>
+             </div>`;
+
+        // 图片水印的专属控件：平铺 / 单张 + 尺寸 + 旋转
+        const imgRow = isImg(it)
+          ? `<div class="wm-item-bot wm-img-row">
+               <select class="wm-imgmode">
+                 <option value="tile"${it.mode !== 'single' ? ' selected' : ''}>平铺</option>
+                 <option value="single"${it.mode === 'single' ? ' selected' : ''}>单张</option>
+               </select>
+               <div class="wm-slide"><span>尺寸</span><input type="range" class="wm-scale" min="0.05" max="1.5" step="0.01" value="${it.scale == null ? 0.5 : it.scale}"><output class="wm-scale-out">${Math.round((it.scale == null ? 0.5 : it.scale) * 100)}%</output></div>
+               <div class="wm-slide"><span>透明</span><input type="range" class="wm-op" min="0.02" max="1" step="0.01" value="${op}"><output class="wm-op-out">${opPct}</output></div>
+               <button class="wm-pos-chip${open ? ' on' : ''}" type="button" title="自定义位置">位置</button>
+             </div>
+             <div class="wm-item-bot wm-img-row2">
+               <label class="wm-inline">每行重复<input type="range" class="wm-tile" min="1" max="6" step="1" value="${it.tile == null ? 1 : it.tile}"${it.mode === 'single' ? ' disabled' : ''}><output class="wm-tile-out">${it.tile == null ? 1 : it.tile}</output></label>
+               <label class="wm-inline">旋转<input type="range" class="wm-rot" min="-45" max="45" step="1" value="${it.rotate || 0}"><output class="wm-rot-out">${it.rotate || 0}°</output></label>
+             </div>`
+          : `<div class="wm-item-bot">
+               <input type="color" class="wm-color" value="${U.esc(it.color || '#ffffff')}" title="文字颜色">
+               <select class="wm-anchor"${free ? ' disabled' : ''}>
+                 ${ANCHORS.map(([v, t]) => `<option value="${v}"${it.anchor === v ? ' selected' : ''}>${t}</option>`).join('')}
+               </select>
+               <div class="wm-slide"><span>字号</span><input type="range" class="wm-size" min="0.5" max="2.6" step="0.05" value="${it.size || 1}"></div>
+               <div class="wm-slide"><span>透明</span><input type="range" class="wm-op" min="0.05" max="1" step="0.05" value="${op}"><output class="wm-op-out">${opPct}</output></div>
+               <button class="wm-pos-chip${open ? ' on' : ''}" type="button" title="自定义位置">位置</button>
+             </div>`;
+
+        // 九宫格下拉：图文都需要（平铺模式下也可选起始角）
+        const anchorSel = isImg(it)
+          ? `<div class="wm-item-bot wm-img-row3">
+               <span class="wm-mini">对齐</span>
+               <select class="wm-anchor"${free ? ' disabled' : ''}>
+                 ${ANCHORS.map(([v, t]) => `<option value="${v}"${it.anchor === v ? ' selected' : ''}>${t}</option>`).join('')}
+               </select>
+             </div>`
+          : '';
+
         return `
-      <div class="wm-item" data-i="${i}">
-        <div class="wm-item-top">
-          <input type="text" class="wm-text" value="${U.esc(it.text)}" placeholder="输入水印文字，可用占位符">
-          <button class="wm-del" type="button" title="删除">×</button>
-        </div>
-        <div class="wm-item-bot">
-          <input type="color" class="wm-color" value="${U.esc(it.color || '#ffffff')}" title="文字颜色">
-          <select class="wm-anchor"${free ? ' disabled' : ''}>
-            ${ANCHORS.map(([v, t]) => `<option value="${v}"${it.anchor === v ? ' selected' : ''}>${t}</option>`).join('')}
-          </select>
-          <div class="wm-slide"><span>字号</span><input type="range" class="wm-size" min="0.5" max="2.6" step="0.05" value="${it.size || 1}"></div>
-          <div class="wm-slide"><span>透明</span><input type="range" class="wm-op" min="0.05" max="1" step="0.05" value="${it.opacity == null ? 0.9 : it.opacity}"><output class="wm-op-out">${Math.round((it.opacity == null ? 0.9 : it.opacity) * 100)}%</output></div>
-          <button class="wm-pos-chip${open ? ' on' : ''}" type="button" title="自定义位置">位置</button>
-        </div>
+      <div class="wm-item${isImg(it) ? ' is-img' : ''}" data-i="${i}">
+        ${head}
+        ${imgRow}
+        ${anchorSel}
         <div class="wm-pos"${open ? '' : ' hidden'}>
           <div class="wm-pos-mode">
             <button type="button" class="wm-mode-btn${free ? '' : ' on'}" data-mode="anchor">九宫格</button>
@@ -441,48 +523,75 @@
     const list = wmListRef();
     const it = list[+item.dataset.i];
     if (!it) return;
-    if (e.target.classList.contains('wm-text')) it.text = e.target.value;
-    else if (e.target.classList.contains('wm-size')) it.size = +e.target.value;
-    else if (e.target.classList.contains('wm-op')) {
-      it.opacity = +e.target.value;
-      const out = item.querySelector('.wm-op-out');
-      if (out) out.textContent = Math.round(+e.target.value * 100) + '%';
-    }
-    else if (e.target.classList.contains('wm-dx') || e.target.classList.contains('wm-dy')) {
-      const isX = e.target.classList.contains('wm-dx');
-      if (isX) it.dx = +e.target.value; else it.dy = +e.target.value;
-      const out = e.target.parentElement.querySelector('output');
-      if (out) out.textContent = fmtPct(e.target.value);
-    } else if (e.target.classList.contains('wm-color')) {
-      it.color = e.target.value;
-    } else if (e.target.classList.contains('wm-px') || e.target.classList.contains('wm-py')) {
-      const isX = e.target.classList.contains('wm-px');
-      if (isX) it.px = +e.target.value; else it.py = +e.target.value;
-      const out = e.target.parentElement.querySelector('output');
-      if (out) out.textContent = Math.round(+e.target.value) + '%';
+    const t = e.target;
+    const putOut = (sel, txt) => {
+      const o = item.querySelector(sel);
+      if (o) o.textContent = txt;
+    };
+
+    if (t.classList.contains('wm-text')) it.text = t.value;
+    else if (t.classList.contains('wm-size')) it.size = +t.value;
+    else if (t.classList.contains('wm-op')) {
+      it.opacity = +t.value;
+      putOut('.wm-op-out', Math.round(+t.value * 100) + '%');
+    } else if (t.classList.contains('wm-scale')) {
+      it.scale = +t.value;
+      putOut('.wm-scale-out', Math.round(+t.value * 100) + '%');
+    } else if (t.classList.contains('wm-tile')) {
+      it.tile = +t.value;
+      putOut('.wm-tile-out', t.value);
+    } else if (t.classList.contains('wm-rot')) {
+      it.rotate = +t.value;
+      putOut('.wm-rot-out', t.value + '°');
+    } else if (t.classList.contains('wm-dx') || t.classList.contains('wm-dy')) {
+      const isX = t.classList.contains('wm-dx');
+      if (isX) it.dx = +t.value; else it.dy = +t.value;
+      const out = t.parentElement.querySelector('output');
+      if (out) out.textContent = fmtPct(t.value);
+    } else if (t.classList.contains('wm-color')) {
+      it.color = t.value;
+    } else if (t.classList.contains('wm-px') || t.classList.contains('wm-py')) {
+      const isX = t.classList.contains('wm-px');
+      if (isX) it.px = +t.value; else it.py = +t.value;
+      const out = t.parentElement.querySelector('output');
+      if (out) out.textContent = Math.round(+t.value) + '%';
     } else return;
     commit();
   });
 
   el.wmList.addEventListener('change', (e) => {
-    if (!e.target.classList.contains('wm-anchor')) return;
     const item = e.target.closest('.wm-item');
     const list = wmListRef();
-    const it = list[+item.dataset.i];
+    const it = item ? list[+item.dataset.i] : null;
     if (!it) return;
-    it.anchor = e.target.value;
-    commit(true);
+    if (e.target.classList.contains('wm-anchor')) {
+      it.anchor = e.target.value;
+      commit(true);
+    } else if (e.target.classList.contains('wm-imgmode')) {
+      it.mode = e.target.value;
+      renderWmList();
+      commit(true);
+    }
   });
 
   el.wmList.addEventListener('click', (e) => {
     const item = e.target.closest('.wm-item');
     if (!item) return;
-    const it = wmListRef()[+item.dataset.i];
+    const idx = +item.dataset.i;
+    const it = wmListRef()[idx];
     if (!it) return;
 
     if (e.target.classList.contains('wm-del')) {
       wmPosOpen.delete(it.id);
-      wmListRef().splice(+item.dataset.i, 1);
+      // 用户主动删掉的自动水印，记下来，下次不再自动补回
+      if (!isImg(it) && wmTab === 'per') {
+        const txt = String(it.text || '');
+        state.wmSuppressed = state.wmSuppressed || [];
+        if (txt.indexOf('{folder}') >= 0 && state.wmSuppressed.indexOf('folder') < 0) state.wmSuppressed.push('folder');
+        if (txt.indexOf('{date}') >= 0 && state.wmSuppressed.indexOf('date') < 0) state.wmSuppressed.push('date');
+      }
+      if (it.kind === 'image' && it.thumbUrl) URL.revokeObjectURL(it.thumbUrl);
+      wmListRef().splice(idx, 1);
       renderWmList();
       commit(true);
       return;
@@ -504,20 +613,11 @@
       const toFree = modeBtn.dataset.mode === 'free';
       it.free = toFree;
       if (toFree && it.px == null) { it.px = 8; it.py = 92; }
+      wmPosOpen.add(it.id);
       renderWmList();
-      // 重新渲染后展开位置面板
-      const again = el.wmList.querySelector(`.wm-item[data-i="${item.dataset.i}"]`);
-      if (again) {
-        const p2 = again.querySelector('.wm-pos');
-        if (p2) p2.hidden = false;
-        const c2 = again.querySelector('.wm-pos-chip');
-        if (c2) c2.classList.add('on');
-      }
       commit(true);
       return;
     }
-
-    // 取色器为原生 input[type=color]，点击即弹系统面板，无需额外处理
 
     const reset = e.target.closest('.wm-pos-reset');
     if (reset) {
@@ -537,9 +637,11 @@
     }
   });
 
+  /* ---------------- 添加水印 ---------------- */
   $('#btnWmAdd').addEventListener('click', () => {
     wmListRef().push({
       id: U.uid(),
+      kind: 'text',
       text: '{folder}',
       anchor: wmTab === 'per' ? 'tl' : 'bc',
       size: 1,
@@ -551,22 +653,84 @@
     commit(true);
   });
 
-  $('#btnWmDefault').addEventListener('click', () => {
-    const d = MN.store.defaultState();
-    if (wmTab === 'per') state.wmPer = d.wmPer;
-    else state.wmGlobal = d.wmGlobal;
-    renderWmList();
-    commit(true);
-    MN.toast('已恢复推荐水印配置');
-  });
+  // 添加 PNG 图片水印
+  async function addImageWm(file) {
+    if (!file) return;
+    if (!/^image\/(png|webp|jpeg|svg\+xml)$/.test(file.type || '') && !/\.(png|webp|jpe?g)$/i.test(file.name || '')) {
+      MN.toast('请选择 PNG 格式的透明底图片', 3000);
+      return;
+    }
+    try {
+      const r = await MN.loadBitmap(file, 2000);
+      wmListRef().push({
+        id: U.uid(),
+        kind: 'image',
+        name: file.name,
+        img: r.img,
+        naturalW: r.w,
+        naturalH: r.h,
+        thumbUrl: URL.createObjectURL(file),
+        mode: 'tile',
+        scale: wmTab === 'per' ? 0.5 : 0.45,
+        tile: 1,
+        rotate: 0,
+        opacity: wmTab === 'per' ? 0.16 : 0.2,
+        anchor: 'tl',
+        dx: 0,
+        dy: 0,
+      });
+      renderWmList();
+      commit(true);
+      MN.toast('已添加花纹水印，可调尺寸和透明度');
+    } catch (err) {
+      MN.toast('这张图片打不开，换一张试试', 3000);
+    }
+  }
 
-  $('#btnWmClear').addEventListener('click', () => {
-    if (wmTab === 'per') state.wmPer = [];
-    else state.wmGlobal = [];
-    renderWmList();
-    commit(true);
-    MN.toast('已清空，可重新输入');
-  });
+  const inputWmImg = $('#inputWmImg');
+  if (inputWmImg) {
+    inputWmImg.addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (f) addImageWm(f);
+    });
+  }
+  const btnWmImg = $('#btnWmImg');
+  if (btnWmImg) btnWmImg.addEventListener('click', () => inputWmImg && inputWmImg.click());
+
+  // 恢复推荐配置
+  const btnWmDefault = $('#btnWmDefault');
+  if (btnWmDefault) {
+    btnWmDefault.addEventListener('click', () => {
+      const d = MN.store.defaultState();
+      if (wmTab === 'per') {
+        state.wmPer = d.wmPer;
+        state.wmSuppressed = [];
+        ensureAutoWm();
+      } else {
+        state.wmGlobal = d.wmGlobal;
+      }
+      renderWmList();
+      commit(true);
+      MN.toast('已恢复推荐水印配置');
+    });
+  }
+
+  // 清空当前页
+  const btnWmClear = $('#btnWmClear');
+  if (btnWmClear) {
+    btnWmClear.addEventListener('click', () => {
+      if (wmTab === 'per') {
+        state.wmPer = [];
+        state.wmSuppressed = [];
+      } else {
+        state.wmGlobal = [];
+      }
+      renderWmList();
+      commit(true);
+      MN.toast('已清空，可重新输入');
+    });
+  }
 
   /* ---------------- 底图 ---------------- */
   function canvasCfg() {
@@ -780,15 +944,9 @@
     if (el.layoutState) el.layoutState.textContent = `${state.layout.cols} 列`;
   }
 
-  el.aspect.addEventListener('change', () => {
-    state.layout.aspect = el.aspect.value;
-    commit(true);
-  });
-
-  el.fill.addEventListener('change', () => {
-    state.layout.fill = el.fill.value;
-    commit(true);
-  });
+  // 比例恒为 16:9，填充恒为不裁剪；这里只做兼容，不再提供切换
+  state.layout.aspect = '16:9';
+  state.layout.fill = 'contain';
 
   el.lastRowFill.addEventListener('change', () => {
     state.layout.lastRow = el.lastRowFill.checked ? 'fill' : 'center';
@@ -832,8 +990,6 @@
     setSlider('#margin', state.layout.margin);
     setSlider('#radius', state.layout.radius);
     setSlider('#quality', state.export.quality);
-    el.aspect.value = String(state.layout.aspect);
-    el.fill.value = state.layout.fill || 'cover';
     el.lastRowFill.checked = state.layout.lastRow === 'fill';
     el.outWidth.value = String(state.export.width);
     el.outFormat.value = state.export.format;
@@ -1053,9 +1209,10 @@
   syncUI();
   scheduleRender();
 
-  // 霞鹜文楷加载完成后重绘一次画布，保证水印用上该字体
+  // 衬线宋体加载完成后重绘，保证画布水印用上正确字形
   if (document.fonts && document.fonts.load) {
-    document.fonts.load('600 20px "LXGW WenKai"').then(() => scheduleRender()).catch(() => {});
+    document.fonts.load('600 20px "Monian Serif"').then(() => scheduleRender()).catch(() => {});
+    document.fonts.load('400 20px "Monian Serif"').then(() => scheduleRender()).catch(() => {});
     document.fonts.ready.then(() => scheduleRender()).catch(() => {});
   }
 

@@ -1,7 +1,14 @@
 @font-face {
-  font-family: "LXGW WenKai";
-  src: url("LXGWWenKai-Regular.woff2") format("woff2");
-  font-weight: 300 700;
+  font-family: "Monian Serif";
+  src: url("NotoSerifSC-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Monian Serif";
+  src: url("NotoSerifSC-SemiBold.woff2") format("woff2");
+  font-weight: 500 700;
   font-style: normal;
   font-display: swap;
 }

@@ -1,6 +1,9 @@
 /* ===========================================================
-   莫念 Monian · render.js
+   Monian · render.js
    画布排版与绘制（预览与导出共用同一套比例逻辑）
+
+   核心约束：素材全部是 16:9，任何模式下都【不裁剪】。
+   格子比例恒为 16:9，图片用 contain 完整贴合。
    =========================================================== */
 (function () {
   'use strict';
@@ -8,7 +11,9 @@
   const MN = window.MN;
   const U = MN.util;
 
-  const FONT = '"LXGW WenKai","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif';
+  // 与示例图一致的衬线宋体；无衬线只作系统兜底
+  const FONT = '"Monian Serif","Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",serif';
+  const CELL_ASPECT = 16 / 9;
 
   /* ---------------- 平滑缩放绘制 ---------------- */
   function drawSmooth(ctx, src, sx, sy, sw, sh, dx, dy, dw, dh) {
@@ -30,13 +35,12 @@
     ctx.drawImage(cur, csx, csy, csw, csh, dx, dy, dw, dh);
   }
 
-  function drawCover(ctx, src, sw0, sh0, dx, dy, dw, dh) {
-    const scale = Math.max(dw / sw0, dh / sh0);
-    const cw = Math.min(sw0, dw / scale);
-    const ch = Math.min(sh0, dh / scale);
-    const sx = (sw0 - cw) / 2;
-    const sy = (sh0 - ch) / 2;
-    drawSmooth(ctx, src, sx, sy, cw, ch, dx, dy, dw, dh);
+  // 完整显示、绝不裁剪：等比缩放到能装进目标框，居中，多余部分留透明
+  function drawContain(ctx, src, sw0, sh0, dx, dy, dw, dh) {
+    const k = Math.min(dw / sw0, dh / sh0);
+    const w = sw0 * k;
+    const h = sh0 * k;
+    drawSmooth(ctx, src, 0, 0, sw0, sh0, dx + (dw - w) / 2, dy + (dh - h) / 2, w, h);
   }
 
   /* ---------------- 文本工具 ---------------- */
@@ -80,11 +84,16 @@
   }
 
   /* ---------------- 版式计算 ---------------- */
+  // 画布里要处理的对象：文字水印 + 图片水印
+  // kind: 'text' | 'image'
+  function isImageItem(it) { return it && it.kind === 'image'; }
+
   function computeLayout(W, st) {
     const n = st.files.length;
     const L = st.layout;
     const radius = (W * L.radius) / 100;
     const mode = (st.canvas && st.canvas.mode) || 'solid';
+    const gap = mode === 'none' ? (W * L.gap) / 100 : (W * L.gap) / 100;
 
     // 自定义底图：画布比例由底图决定，图片放进设定的放置区域
     if (mode === 'image' && st.template && st.template.img) {
@@ -99,29 +108,17 @@
       };
       const cols = Math.max(1, Math.min(L.cols, n || 1));
       const rows = Math.max(1, Math.ceil(n / cols));
-      const gap = (area.w * L.gap) / 100;
-      const cellW = Math.max(1, (area.w - gap * (cols - 1)) / cols);
-      let cellH = Math.max(1, (area.h - gap * (rows - 1)) / rows);
-      let cw = cellW;
-      let ch = cellH;
-      let gridTop = area.y;
 
-      // 保持比例：按图片比例反推格子尺寸，保证不裁剪，整块居中
-      if (L.fill === 'contain') {
-        let asp2;
-        if (L.aspect === 'auto') {
-          const f = st.files[0];
-          asp2 = f && f.w && f.h ? f.w / f.h : 0.75;
-          asp2 = U.clamp(asp2, 0.4, 2.4);
-        } else {
-          asp2 = parseFloat(L.aspect) || 0.75;
-        }
-        const maxH = Math.max(1, (area.h - gap * (rows - 1)) / rows);
-        ch = cellW / asp2;
-        if (ch > maxH) { ch = maxH; cw = ch * asp2; }
-        const gridH = rows * ch + (rows - 1) * gap;
-        gridTop = area.y + Math.max(0, (area.h - gridH) / 2);
+      // 格子恒为 16:9：先按可用宽度算，若超出可用高度再按高度回缩
+      let cw = Math.max(1, (area.w - gap * (cols - 1)) / cols);
+      let ch = cw / CELL_ASPECT;
+      const maxH = Math.max(1, (area.h - gap * (rows - 1)) / rows);
+      if (ch > maxH) {
+        ch = maxH;
+        cw = ch * CELL_ASPECT;
       }
+      const gridH = rows * ch + (rows - 1) * gap;
+      const gridTop = area.y + Math.max(0, (area.h - gridH) / 2);
 
       const cells = [];
       for (let i = 0; i < n; i++) {
@@ -135,27 +132,17 @@
           w: cw, h: ch, i,
         });
       }
-      return { W, H, cells, area, mode: 'image', radius, gap, cols, rows, cellW, cellH, gridTop };
+      return { W, H, cells, area, mode: 'image', radius, gap, cols, rows, cellW: cw, cellH: ch, gridTop };
     }
 
     // 纯色底图 / 无底图
     const noBase = mode === 'none';
     const margin = noBase ? 0 : (W * L.margin) / 100;
-    const gap = (W * L.gap) / 100;
     const cols = Math.max(1, Math.min(L.cols, n || 1));
     const rows = Math.max(1, Math.ceil(n / cols));
     const cellW = Math.max(1, (W - margin * 2 - gap * (cols - 1)) / cols);
-
-    let aspect;
-    if (L.aspect === 'auto') {
-      const f = st.files[0];
-      aspect = f && f.w && f.h ? f.w / f.h : 0.75;
-      // 收窄范围：避免极长条比例把格子拉得过高，导致整张图很长
-      aspect = U.clamp(aspect, 0.55, 1.8);
-    } else {
-      aspect = parseFloat(L.aspect) || 0.75;
-    }
-    let cellH = cellW / aspect;
+    // 恒 16:9，绝不拉伸
+    let cellH = cellW / CELL_ASPECT;
 
     const title = ((st.header && st.header.title) || '').trim();
     const meta = ((st.header && st.header.meta) || '').trim();
@@ -164,21 +151,8 @@
 
     const headerH = hasHead ? W * 0.152 : 0;
     const footGap = noBase ? 0 : W * 0.068;
-    let padTop = margin + headerH + (hasHead ? gap * 1.6 : 0);
-    let padBottom = noBase ? 0 : gap * 2 + footGap + margin;
-
-    // 纯色底图且开启标题栏时：限制整体高宽比，避免竖图 + 多行导致下半截空出一大片
-    if (!noBase && hasHead) {
-      const maxRatio = 2.25;
-      const fixed = padTop + padBottom + (rows - 1) * gap;
-      const maxGridH = W * maxRatio - fixed;
-      if (rows * cellH > maxGridH) {
-        const fitH = Math.max(W * 0.1, maxGridH / rows);
-        cellH = fitH;
-        padTop = margin + headerH + (hasHead ? gap * 1.6 : 0);
-        padBottom = noBase ? 0 : gap * 2 + footGap + margin;
-      }
-    }
+    const padTop = margin + headerH + (hasHead ? gap * 1.6 : 0);
+    const padBottom = noBase ? 0 : gap * 2 + footGap + margin;
 
     const gridH = rows * cellH + (rows - 1) * gap;
     const H = Math.max(1, Math.round(padTop + gridH + padBottom));
@@ -196,7 +170,7 @@
       });
     }
 
-    // 末行不满格：可选「铺满整行」（等比放大）
+    // 末行不满格：可选「铺满整行」（仍然保持 16:9，只放大尺寸不改变比例）
     let finalH = H;
     if (L.lastRow === 'fill' && n > cols && n % cols !== 0) {
       const lastRow = rows - 1;
@@ -204,14 +178,13 @@
       const fullW = cols * cellW + (cols - 1) * gap;
       const rowW0 = inRow * cellW + (inRow - 1) * gap;
       const k = fullW / rowW0;
-      // 放大后如果有图片总高超过上限则放弃
       const bh = cellH * k;
       if (padTop + gridH + (bh - cellH) + padBottom <= W * 2.6) {
         const baseY = padTop + lastRow * (cellH + gap);
         cells.forEach((cell) => {
           if (cell.i >= lastRow * cols) {
             cell.w *= k;
-            cell.h = bh;
+            cell.h = bh;               // 等比放大，比例仍是 16:9
             cell.y = baseY;
           }
         });
@@ -221,9 +194,7 @@
 
     return {
       W, H: finalH, cells, mode: noBase ? 'none' : 'solid', radius, gap, cols, rows, cellW, cellH, margin,
-      headerH, hasHead,
-      headerTop: margin,
-      gridTop: padTop,
+      headerH, hasHead, headerTop: margin, gridTop: padTop,
     };
   }
 
@@ -232,12 +203,94 @@
     return ctx.measureText(ln.text).width;
   }
 
+  /* ---------------- 图片水印（PNG 花纹） ---------------- */
+  // it: { kind:'image', img, naturalW, naturalH, mode:'tile'|'single',
+  //       opacity, scale, tile (每屏横向重复次数), anchor, dx, dy, free, px, py, rotate }
+  function drawImageWatermark(ctx, it, rect) {
+    if (!isImageItem(it) || !it.img) return;
+    const op = U.clamp(it.opacity == null ? 0.18 : +it.opacity, 0, 1);
+    const iw = it.naturalW || it.img.width;
+    const ih = it.naturalH || it.img.height;
+    if (!iw || !ih) return;
+
+    ctx.save();
+    ctx.globalAlpha = op;
+
+    const tile = it.mode !== 'single';
+
+    if (tile) {
+      // 平铺：取「画布宽 / reps」为基准块宽，再按 scale 放大块数并对齐到画布边缘，
+      // 保证每一块的左右边界都落在画布整像素上，不产生重叠或缝隙
+      const reps = Math.max(1, Math.round(it.tile == null ? 1 : +it.tile));
+      const scale = U.clamp(it.scale == null ? 1 : +it.scale, 0.1, 4);
+      let w = (rect.w / reps) * scale;
+      const h = (w * ih) / iw;
+
+      // 横向块数向上取整，blockW 用「实际块数」重新均分，消除累积误差
+      const nx = Math.max(1, Math.round(rect.w / w));
+      const bw = rect.w / nx;
+      const bh = (bw * ih) / iw;
+
+      const a = it.anchor || 'tl';
+      const offX = (rect.w * U.clamp(+(it.dx || 0), -60, 60)) / 100;
+      const offY = (rect.h * U.clamp(+(it.dy || 0), -60, 60)) / 100;
+      const yBase = a[0] === 'b' ? rect.y + rect.h - bh : a[0] === 'm' ? rect.y + (rect.h - bh) / 2 : rect.y;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(rect.x, rect.y, rect.w, rect.h);
+      ctx.clip();
+
+      // 横向从 -1 块开始画，覆盖负偏移；纵向同理
+      const startC = Math.floor(offX / bw) - 1;
+      for (let c = startC; c * bw < rect.w + bw; c++) {
+        const x = rect.x + c * bw + (offX % bw);
+        for (let k = Math.floor(offY / bh) - 1; k * bh < rect.h + bh; k++) {
+          const y = yBase + k * bh + (offY % bh);
+          ctx.drawImage(it.img, Math.round(x), Math.round(y), Math.ceil(bw) + 1, Math.ceil(bh) + 1);
+        }
+      }
+      ctx.restore();
+    } else {
+      // 单张：按宽度百分比缩放，九宫格或自由定位
+      const w = rect.w * U.clamp(it.scale == null ? 0.5 : +it.scale, 0.02, 3);
+      const h = (w * ih) / iw;
+      let x, y;
+      if (it.free) {
+        x = rect.x + (rect.w * U.clamp(it.px == null ? 50 : +it.px, 0, 100)) / 100 - w / 2;
+        y = rect.y + (rect.h * U.clamp(it.py == null ? 50 : +it.py, 0, 100)) / 100 - h / 2;
+      } else {
+        const a = it.anchor || 'mc';
+        const pad = rect.w * 0.02;
+        x = a[1] === 'l' ? rect.x + pad : a[1] === 'r' ? rect.x + rect.w - w - pad : rect.x + (rect.w - w) / 2;
+        y = a[0] === 't' ? rect.y + pad : a[0] === 'b' ? rect.y + rect.h - h - pad : rect.y + (rect.h - h) / 2;
+        x += (rect.w * U.clamp(+(it.dx || 0), -60, 60)) / 100;
+        y += (rect.h * U.clamp(+(it.dy || 0), -60, 60)) / 100;
+      }
+      if (it.rotate) {
+        ctx.translate(x + w / 2, y + h / 2);
+        ctx.rotate((+it.rotate * Math.PI) / 180);
+        ctx.drawImage(it.img, -w / 2, -h / 2, w, h);
+      } else {
+        ctx.drawImage(it.img, x, y, w, h);
+      }
+    }
+
+    ctx.restore();
+  }
+
   /* ---------------- 水印分组绘制 ---------------- */
   function drawWatermarkGroup(ctx, items, rect, baseSize, vars, padMul) {
     if (!items || !items.length) return;
 
+    // 先画图片水印（在文字下层）
+    for (const it of items) {
+      if (isImageItem(it)) drawImageWatermark(ctx, it, rect);
+    }
+
     const groups = {};
     for (const it of items) {
+      if (isImageItem(it)) continue;
       const txt = subst(it.text, vars);
       if (!txt || !txt.trim()) continue;
       const a = it.anchor || 'bl';
@@ -419,7 +472,7 @@
 
     // 每张图
     const n = st.files.length;
-    const hasWm = st.wmPer.some((w) => w.text && w.text.trim());
+    const hasTextWm = (st.wmPer || []).some((w) => !isImageItem(w) && w.text && w.text.trim());
     for (const cell of lay.cells) {
       const f = st.files[cell.i];
       ctx.save();
@@ -431,10 +484,11 @@
       ctx.fillRect(cell.x, cell.y, cell.w, cell.h);
 
       if (f && f.img) {
-        drawCover(ctx, f.img, f.w, f.h, cell.x, cell.y, cell.w, cell.h);
+        // 关键：contain 而非 cover，完整显示不裁剪
+        drawContain(ctx, f.img, f.w, f.h, cell.x, cell.y, cell.w, cell.h);
 
         // 底部衬底渐变，让浅色画面上文字也清晰
-        if (hasWm) {
+        if (hasTextWm) {
           const g = ctx.createLinearGradient(0, cell.y + cell.h * 0.52, 0, cell.y + cell.h);
           g.addColorStop(0, 'rgba(0,0,0,0)');
           g.addColorStop(0.5, 'rgba(0,0,0,0.24)');
@@ -450,7 +504,7 @@
         ctx.fillText('载入中…', cell.x + cell.w / 2, cell.y + cell.h / 2);
       }
 
-      // 每张图水印
+      // 每张图水印（含图片水印）
       const vars = {
         folder: st.folderName || '',
         date: st.dateText || '',
@@ -502,6 +556,7 @@
 
   /* ---------------- 对外 ---------------- */
   MN.Render = {
+    CELL_ASPECT,
     layout: computeLayout,
     paint,
     renderTo(ctx, W, st, opts) {
