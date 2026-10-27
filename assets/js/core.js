@@ -77,7 +77,7 @@
       // 大标题样式 / 位置（锚点是标题栏区域内的九宫格，dx/dy 为百分比微调）
       titleStyle: { anchor: 'ml', dx: 0, dy: 0, size: 0, color: '', spacing: null },
       // 相关信息样式 / 位置（size 为相对画布宽度的比例，0 = 用默认）
-      metaStyle: { anchor: 'mr', dx: 0, dy: 0, size: 0, color: '' },
+      metaStyle: { anchor: 'mr', dx: 0, dy: 0, size: 0, color: '', spacing: 0.004 },
     },
     canvas: {
       mode: 'solid',      // solid: 纯色底图 / image: 自定义底图 / none: 无底图

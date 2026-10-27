@@ -902,7 +902,7 @@
     if (!state.header) state.header = { title: '', meta: '' };
     const h = state.header;
     if (!h.titleStyle) h.titleStyle = { anchor: 'ml', dx: 0, dy: 0, size: 0, color: '', spacing: null };
-    if (!h.metaStyle) h.metaStyle = { anchor: 'mr', dx: 0, dy: 0, size: 0, color: '' };
+    if (!h.metaStyle) h.metaStyle = { anchor: 'mr', dx: 0, dy: 0, size: 0, color: '', spacing: 0.004 };
     return h;
   }
 
@@ -944,11 +944,19 @@
       }
       if (dxInp) dxInp.value = +st.dx || 0;
       if (dyInp) dyInp.value = +st.dy || 0;
-      const sizeOut = box.querySelector('.hs-size ~ output, output');
+      const spInp = box.querySelector('.hs-spacing');
+      if (spInp) spInp.value = st.spacing == null ? 0 : st.spacing;
       const outs = box.querySelectorAll('output');
       if (outs[0]) outs[0].textContent = st.size > 0 ? (st.size * 100).toFixed(1) : '自动';
-      if (outs[1]) outs[1].textContent = fmtSigned(st.dx);
-      if (outs[2]) outs[2].textContent = fmtSigned(st.dy);
+      if (outs[1] && which === 'meta') {
+        // meta 的第 2 个 output 是「字距」
+        outs[1].textContent = (st.spacing == null ? 0 : st.spacing).toFixed(3).replace(/0+$/, '').replace(/\.$/, '') || '0';
+        if (outs[2]) outs[2].textContent = fmtSigned(st.dx);
+        if (outs[3]) outs[3].textContent = fmtSigned(st.dy);
+      } else {
+        if (outs[1]) outs[1].textContent = fmtSigned(st.dx);
+        if (outs[2]) outs[2].textContent = fmtSigned(st.dy);
+      }
       // 颜色是否被用户改过：没改过时标注「自动」
       if (colorInp) colorInp.title = st.color ? '自定义颜色' : '自动（跟随底图明暗）';
     });
@@ -978,13 +986,17 @@
           st.size = +t.value;
           const o = box.querySelectorAll('output')[0];
           if (o) o.textContent = (+t.value * 100).toFixed(1);
+        } else if (t.classList.contains('hs-spacing')) {
+          st.spacing = +t.value;
+          const o = box.querySelectorAll('output')[1];
+          if (o) o.textContent = (+t.value).toFixed(3).replace(/0+$/, '').replace(/\.$/, '') || '0';
         } else if (t.classList.contains('hs-dx')) {
           st.dx = +t.value;
-          const o = box.querySelectorAll('output')[1];
+          const o = box.querySelectorAll('output')[which === 'meta' ? 2 : 1];
           if (o) o.textContent = fmtSigned(t.value);
         } else if (t.classList.contains('hs-dy')) {
           st.dy = +t.value;
-          const o = box.querySelectorAll('output')[2];
+          const o = box.querySelectorAll('output')[which === 'meta' ? 3 : 2];
           if (o) o.textContent = fmtSigned(t.value);
         } else return;
         commit();
@@ -996,6 +1008,7 @@
         const st = styleOf(which);
         st.anchor = which === 'meta' ? 'mr' : 'ml';
         st.dx = 0; st.dy = 0; st.size = 0; st.color = '';
+        if (which === 'meta') st.spacing = 0.004;
         syncHeadStyleUI();
         commit(true);
       });
@@ -1211,8 +1224,8 @@
     if (el.layoutState) el.layoutState.textContent = `${state.layout.cols} 列`;
   }
 
-  // 比例恒为 16:9，填充恒为不裁剪；这里只做兼容，不再提供切换
-  state.layout.aspect = '16:9';
+  // 比例自动跟随素材（默认 16:9），填充恒为不裁剪；这里只做兼容，不再提供切换
+  state.layout.aspect = 'auto';
   state.layout.fill = 'contain';
 
   el.lastRowFill.addEventListener('change', () => {
