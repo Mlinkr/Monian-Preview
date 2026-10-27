@@ -476,7 +476,12 @@
       const raw = a.text == null || String(a.text).trim() === '' ? fallback : a.text;
       const t = subst(raw, vars || {}).trim();
       if (!t) return;
-      out.push({ kind: 'text', text: t, anchor: a.anchor || 'bl', size: a.size || 1, opacity: a.opacity == null ? 0.9 : a.opacity, weight: a.weight || 400, color: a.color || '#ffffff', dx: a.dx || 0, dy: a.dy || 0 });
+      out.push({
+        kind: 'text', text: t, anchor: a.anchor || 'bl', size: a.size || 1,
+        opacity: a.opacity == null ? 0.9 : a.opacity, weight: a.weight || 400,
+        color: a.color || '#ffffff', dx: a.dx || 0, dy: a.dy || 0,
+        free: !!a.free, px: a.px == null ? 7 : +a.px, py: a.py == null ? 78 : +a.py,
+      });
     };
     mk('folder', '{folder}');
     mk('date', '{date}');
@@ -519,8 +524,8 @@
     }
 
     /* ===== 1 素材拼接 ===== */
-    const hasTextWm = autoItems(st, perVars(0)).length > 0 ||
-      perList.some((w) => !isImageItem(w) && w.text && w.text.trim());
+    // 衬底渐变只是给「文字水印」垫底，不能压在图片水印上面，所以只在文字所在一侧淡淡加一点
+    const textItemsAll = (i) => autoItems(st, perVars(i)).concat(perList.filter((w) => !isImageItem(w)));
     for (const cell of lay.cells) {
       const f = st.files[cell.i];
       ctx.save();
@@ -532,11 +537,14 @@
 
       if (f && f.img) {
         drawContain(ctx, f.img, f.w, f.h, cell.x, cell.y, cell.w, cell.h);
-        if (hasTextWm) {
-          const g = ctx.createLinearGradient(0, cell.y + cell.h * 0.52, 0, cell.y + cell.h);
+        // 文字水印位于下半部分时，给这一段垫一层浅浅的渐变，保证任何底图上都读得清
+        const items = textItemsAll(cell.i);
+        const bottomOnly = items.length > 0 && items.every((it) => !it.free && (it.anchor || 'bl')[0] === 'b');
+        if (items.length) {
+          const g = ctx.createLinearGradient(0, cell.y + cell.h * (bottomOnly ? 0.6 : 0.3), 0, cell.y + cell.h);
           g.addColorStop(0, 'rgba(0,0,0,0)');
-          g.addColorStop(0.5, 'rgba(0,0,0,0.24)');
-          g.addColorStop(1, 'rgba(0,0,0,0.68)');
+          g.addColorStop(0.55, 'rgba(0,0,0,0.14)');
+          g.addColorStop(1, 'rgba(0,0,0,0.38)');
           ctx.fillStyle = g;
           ctx.fillRect(cell.x, cell.y, cell.w, cell.h);
         }

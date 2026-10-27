@@ -714,27 +714,58 @@
     return state.autoWm[key];
   }
 
+  // 01 里每条水印的「位置」面板是否展开（不持久化，纯 UI 状态）
+  const awPosOpen = new Set();
+
   function renderAutoWm() {
     const box = document.getElementById('autoWmBox');
     if (!box) return;
     box.innerHTML = AUTO_KEYS.map(([key, label, phText, inputId, inputPh]) => {
       const a = autoWmRef(key);
+      const on = !!a.on;
+      const free = !!a.free;
+      const dx = +a.dx || 0;
+      const dy = +a.dy || 0;
+      const px = a.px == null ? 8 : +a.px;
+      const py = a.py == null ? 92 : +a.py;
+      const op = a.opacity == null ? 0.9 : a.opacity;
+      const open = awPosOpen.has(key);
       return `
-      <div class="auto-row${a.on ? '' : ' off'}" data-key="${key}">
+      <div class="auto-row${on ? '' : ' off'}" data-key="${key}">
         <div class="auto-row-top">
-          <button type="button" class="aw-on${a.on ? ' on' : ''}" title="点一下开关此水印">${label}</button>
+          <button type="button" class="aw-on${on ? ' on' : ''}" title="点一下开关此水印">${label}</button>
           <input type="text" class="aw-content" data-key="${key}" value="${U.esc(contentOf(key))}" placeholder="${inputPh}">
           <button type="button" class="aw-clear" title="清空内容">×</button>
         </div>
-        <div class="auto-row-bot"${a.on ? '' : ' hidden'}>
+        <div class="auto-row-bot"${on ? '' : ' hidden'}>
           <input type="color" class="aw-color" value="${U.esc(a.color || '#ffffff')}" title="水印颜色">
-          <select class="aw-anchor" title="位置">
+          <select class="aw-anchor"${free ? ' disabled' : ''} title="位置">
             ${ANCHORS.map(([v, t]) => `<option value="${v}"${a.anchor === v ? ' selected' : ''}>${t}</option>`).join('')}
           </select>
-          <div class="wm-slide"><span>字号</span><input type="range" class="aw-size" min="0.4" max="2.6" step="0.05" value="${a.size || 1}"><output>${(a.size || 1).toFixed(2)}</output></div>
-          <div class="wm-slide"><span>透明</span><input type="range" class="aw-op" min="0.02" max="1" step="0.02" value="${a.opacity == null ? 0.9 : a.opacity}"><output class="aw-op-out">${Math.round((a.opacity == null ? 0.9 : a.opacity) * 100)}%</output></div>
+          <button class="aw-pos-chip${open ? ' on' : ''}" type="button" title="自定义位置">位置</button>
         </div>
-        <div class="auto-row-tpl"${a.on ? '' : ' hidden'}>
+        <div class="auto-row-bot"${on ? '' : ' hidden'}>
+          <div class="wm-slide"><span>字号</span><input type="range" class="aw-size" min="0.4" max="2.6" step="0.05" value="${a.size || 1}"><output class="aw-size-out">${(a.size || 1).toFixed(2)}</output></div>
+        </div>
+        <div class="auto-row-bot"${on ? '' : ' hidden'}>
+          <div class="wm-slide"><span>透明</span><input type="range" class="aw-op" min="0.02" max="1" step="0.01" value="${op}"><output class="aw-op-out">${Math.round(op * 100)}%</output></div>
+        </div>
+        <div class="aw-pospanel"${on && open ? '' : ' hidden'}>
+          <div class="wm-pos-mode">
+            <button type="button" class="aw-mode-btn${free ? '' : ' on'}" data-mode="anchor">九宫格</button>
+            <button type="button" class="aw-mode-btn${free ? ' on' : ''}" data-mode="free">自由定位</button>
+          </div>
+          <div class="wm-pos-body"${free ? ' hidden' : ''}>
+            <div class="wm-pos-line"><label>左右</label><input type="range" class="aw-dx" min="-50" max="50" step="1" value="${dx}"><output>${fmtPct(dx)}</output></div>
+            <div class="wm-pos-line"><label>上下</label><input type="range" class="aw-dy" min="-50" max="50" step="1" value="${dy}"><output>${fmtPct(dy)}</output></div>
+          </div>
+          <div class="wm-pos-free"${free ? '' : ' hidden'}>
+            <div class="wm-pos-line"><label>横向</label><input type="range" class="aw-px" min="0" max="100" step="1" value="${px}"><output>${Math.round(px)}%</output></div>
+            <div class="wm-pos-line"><label>纵向</label><input type="range" class="aw-py" min="0" max="100" step="1" value="${py}"><output>${Math.round(py)}%</output></div>
+          </div>
+          <button class="aw-pos-reset wm-pos-reset" type="button">归零</button>
+        </div>
+        <div class="auto-row-tpl"${on ? '' : ' hidden'}>
           <span class="aw-tpl-label">水印文字</span>
           <input type="text" class="aw-text" value="${U.esc(a.text == null ? AUTO_DEFAULT_TEXT[key] : a.text)}" placeholder="${AUTO_PH[key]}">
         </div>
@@ -753,11 +784,52 @@
         a.on = !a.on;
         renderAutoWm();
         commit(true);
-      } else if (e.target.classList.contains('aw-clear')) {
+        return;
+      }
+      if (e.target.classList.contains('aw-clear')) {
         setContent(key, '');
         const inp = row.querySelector('.aw-content');
         if (inp) inp.value = '';
         commit();
+        return;
+      }
+
+      const chip = e.target.closest('.aw-pos-chip');
+      if (chip) {
+        const panel = row.querySelector('.aw-pospanel');
+        const open = panel.hidden;
+        panel.hidden = !open;
+        chip.classList.toggle('on', open);
+        if (open) awPosOpen.add(key); else awPosOpen.delete(key);
+        return;
+      }
+
+      // 九宫格 / 自由定位
+      const modeBtn = e.target.closest('.aw-mode-btn');
+      if (modeBtn) {
+        const a = autoWmRef(key);
+        const toFree = modeBtn.dataset.mode === 'free';
+        a.free = toFree;
+        if (toFree && a.px == null) { a.px = 7; a.py = 78; }
+        awPosOpen.add(key);
+        renderAutoWm();
+        commit(true);
+        return;
+      }
+
+      const reset = e.target.closest('.aw-pos-reset');
+      if (reset) {
+        const a = autoWmRef(key);
+        a.dx = 0; a.dy = 0; a.px = 7; a.py = 78;
+        const dx = row.querySelector('.aw-dx');
+        const dy = row.querySelector('.aw-dy');
+        const px = row.querySelector('.aw-px');
+        const py = row.querySelector('.aw-py');
+        if (dx) { dx.value = 0; dx.parentElement.querySelector('output').textContent = fmtPct(0); }
+        if (dy) { dy.value = 0; dy.parentElement.querySelector('output').textContent = fmtPct(0); }
+        if (px) { px.value = 7; px.parentElement.querySelector('output').textContent = '7%'; }
+        if (py) { py.value = 78; py.parentElement.querySelector('output').textContent = '78%'; }
+        commit(true);
       }
     });
     autoBox.addEventListener('change', (e) => {
@@ -778,7 +850,7 @@
         a.text = t.value;
       } else if (t.classList.contains('aw-size')) {
         a.size = +t.value;
-        const o = t.parentElement.querySelector('output');
+        const o = row.querySelector('.aw-size-out');
         if (o) o.textContent = (+t.value).toFixed(2);
       } else if (t.classList.contains('aw-op')) {
         a.opacity = +t.value;
@@ -786,6 +858,16 @@
         if (o) o.textContent = Math.round(+t.value * 100) + '%';
       } else if (t.classList.contains('aw-color')) {
         a.color = t.value;
+      } else if (t.classList.contains('aw-dx') || t.classList.contains('aw-dy')) {
+        const isX = t.classList.contains('aw-dx');
+        if (isX) a.dx = +t.value; else a.dy = +t.value;
+        const out = t.parentElement.querySelector('output');
+        if (out) out.textContent = fmtPct(t.value);
+      } else if (t.classList.contains('aw-px') || t.classList.contains('aw-py')) {
+        const isX = t.classList.contains('aw-px');
+        if (isX) a.px = +t.value; else a.py = +t.value;
+        const out = t.parentElement.querySelector('output');
+        if (out) out.textContent = Math.round(+t.value) + '%';
       } else return;
       commit();
     });
