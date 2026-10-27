@@ -145,7 +145,11 @@
     displayW = Math.max(200, Math.floor(displayW));
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    let pxW = Math.max(280, Math.round(displayW * dpr));
+    // 手机竖屏一格只有 ~684px 宽，字号 0.65 时水印字高不到 10px，调透明度几乎看不出来。
+    // 移动端把画布渲染分辨率放大 1.7 倍（显示尺寸不变，可缩放/滚动查看细节），
+    // 让小字也有足够像素来表现透明度变化。
+    const resBoost = isMobile ? 1.7 : 1;
+    let pxW = Math.max(280, Math.round(displayW * dpr * resBoost));
 
     let lay = MN.Render.layout(pxW, state);
     const budget = 26e6;

@@ -386,9 +386,13 @@
         ctx.textAlign = align;
         ctx.textBaseline = 'alphabetic';
         const op = U.clamp(ln.op, 0, 1);
-        ctx.shadowColor = `rgba(0,0,0,${(0.62 * op).toFixed(3)})`;
-        ctx.shadowBlur = Math.max(1, ln.fs * 0.42);
-        ctx.shadowOffsetY = Math.max(0.5, ln.fs * 0.04);
+        // 阴影只为「提高可读性」，必须严格跟随透明度衰减。
+        // 之前 0.62*op 且 blur 固定，op=0.02 时阴影仍有 1.2% 覆盖率 + 大模糊，
+        // 等于给每个字套了一层不透明的底，导致调透明度看不出变化。
+        const shOp = 0.5 * op * op;
+        ctx.shadowColor = `rgba(0,0,0,${shOp.toFixed(4)})`;
+        ctx.shadowBlur = Math.max(0.5, ln.fs * 0.3 * op);
+        ctx.shadowOffsetY = Math.max(0.3, ln.fs * 0.03);
         ctx.globalAlpha = op;
         ctx.fillStyle = ln.color || '#ffffff';
         ctx.fillText(ln.text, x, baseline);
