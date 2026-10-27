@@ -323,6 +323,7 @@
     state.countText = String(state.files.length);
     renderThumbs();
     syncRatioTip();
+    syncHeadStyleUI();       // 文件夹名变了 → 标题回退文字变了 → 字号上限同步
     commit(true);
     MN.toast(`已载入 ${state.files.length} 张图片`);
   }
@@ -939,6 +940,13 @@
       if (anchorSel) anchorSel.value = st.anchor || (which === 'meta' ? 'mr' : 'ml');
       if (colorInp) colorInp.value = st.color || autoInk();
       if (sizeInp) {
+        // 标题滑条上限跟随版式实时变化：滑到最右 = 当前能放下的最大字号
+        if (which === 'title' && MN.Render && MN.Render.titleSizeCap) {
+          const cap = MN.Render.titleSizeCap(state);
+          sizeInp.max = String(Math.max(0.02, +cap.toFixed(3)));
+          // 之前拉到过更大的值、现在上限变小了，把值收回来
+          st.size = Math.min(st.size, +sizeInp.max);
+        }
         const def = which === 'meta' ? 0.0152 : 0.047;
         sizeInp.value = st.size > 0 ? st.size : def;
       }
@@ -1235,10 +1243,12 @@
 
   el.headerTitle.addEventListener('input', () => {
     state.header.title = el.headerTitle.value;
+    syncHeadStyleUI();          // 标题长度变了 → 字号上限跟着变（滑条 max 同步）
     commit();
   });
   el.headerMeta.addEventListener('input', () => {
     state.header.meta = el.headerMeta.value;
+    syncHeadStyleUI();
     commit();
   });
 

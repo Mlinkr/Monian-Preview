@@ -553,7 +553,7 @@
     }
 
     /* ---- 标题：目标字号（用户设定）→ 仅在放不下时才缩 ---- */
-    const wantTs = T.size > 0 ? W * T.size : areaH * 0.64;
+    const wantTs = T.size > 0 ? W * T.size : areaH * 0.64;    // 未设定时按标题栏高度自适应
     if (!title) return;
 
     // 水平可用的最大宽度：从锚点这一侧到「相关信息左侧」（或整行）
@@ -573,8 +573,10 @@
     let ts = wantTs;
     let tw = titleWidth(title, ts);
 
-    // 上限一：字号不超过标题栏高度能容纳的字身
-    const capH = areaH * 0.98;
+    // 上限一：字号不能高过「页面上边距 + 标题栏 + 网格前的留白」这段可用高度
+    // 标题可以稍稍越过标题栏下沿，用掉网格上方那点留白，这样字号滑块才有真实的调节余量；
+    // 但不能顶到画布上边缘，也不能压到图片网格
+    const capH = (lay.gridTop - areaTop) * 0.94;
     if (ts > capH) {
       ts = capH;
       tw = titleWidth(title, ts);
@@ -592,12 +594,21 @@
 
     const th = ts;
     let tx = x0 + (limit - tw) * tAnchor[0];
-    // 纵向：标题基线让字形在标题栏内居中
-    let ty = areaTop + (areaH + th * 0.72) / 2;
+    // 纵向：先按「标题栏内居中」算出基线，再按字体真实 ascent/descent 夹边界
+    // 中文衬线的实际字身：上升约 0.86em、下降约 0.12em（用实测值，不能拍脑袋）
+    setFont(ctx, th, 600);
+    const mM = ctx.measureText(title);
+    const asc = (mM.actualBoundingBoxAscent || th * 0.86) / th;
+    const dsc = (mM.actualBoundingBoxDescent || th * 0.12) / th;
+    let ty = areaTop + (areaH + th * (asc - dsc)) / 2;
     tx += (rowW * tDx) / 100;
     ty += (areaH * tDy) / 100;
     tx = U.clamp(tx, x0, Math.max(x0, x1 - tw));
-    ty = U.clamp(ty, areaTop + th * 0.78, areaBottom);
+    // 夹在「画布上边距之下、网格上沿之上」，字身上下都不越界
+    const topPad = Math.max(areaTop, W * 0.012);
+    const tyMin = topPad + th * asc;
+    const tyMax = Math.min(areaBottom + th * 0.06, lay.gridTop - th * 0.04);
+    ty = U.clamp(ty, tyMin, Math.max(tyMin, tyMax));
 
     // 万一还是压到相关信息：整体挪开（不让两块叠字）
     if (metaBox && rectsOverlap(tx, ty - th * 0.78, tw, th * 1.02, metaBox, W * 0.014)) {
@@ -804,11 +815,48 @@
   }
 
   /* ---------------- 对外 ---------------- */
+  // 标题字号的上限（相对画布宽度）：供 UI 把滑条 max 对齐到「再大也放不下」的位置，
+  // 这样滑块整段都是有效行程，不会出现「拉了没反应」。
+  function titleSizeCap(st) {
+    const W = 800;
+    const lay = computeLayout(W, st);
+    if (!lay.hasHead || !lay.headerH) return 0.16;
+    const title = (st.header.title || st.folderName || '').trim() || '素材预览';
+    const areaTop = lay.headerTop;
+    const areaBottom = areaTop + lay.headerH;
+    const limit = W - lay.margin * 2;                  // 横向可用
+
+    const cv = document.createElement('canvas');
+    const ctx = cv.getContext('2d');
+    const T = (st.header && st.header.titleStyle) || {};
+    const sp = T.spacing == null ? W * 0.0016 : W * T.spacing;
+    const meas = (fs) => {
+      setFont(ctx, fs, 600);
+      let t = 0;
+      for (const c of Array.from(title)) t += ctx.measureText(c).width + sp;
+      return Math.max(0, t - sp);
+    };
+    // 纵向：基线落在 [topPad + asc*fs, min(areaBottom + 0.06*fs, gridTop - 0.04*fs)]
+    // 取这个区间的最大高度，反推 fs（ascent 用实测值）
+    const topPad = Math.max(areaTop, W * 0.012);
+    setFont(ctx, 100, 600);
+    const ascEm = (ctx.measureText(title).actualBoundingBoxAscent || 86) / 100;
+    const byTop = (areaBottom + 0.06 * 100 - topPad) / (ascEm + 0.06);
+    const byGrid = (lay.gridTop - 0.04 * 100 - topPad) / (ascEm + 0.04);
+    let cap = Math.max(W * 0.015, Math.min(byTop, byGrid));
+
+    // 横向：再按可用宽度缩（0.995 安全边，与 paintHeader 一致）
+    const wAt = meas(cap);
+    if (wAt > limit * 0.995) cap = cap * (limit * 0.995) / wAt;
+    return U.clamp(cap / W, 0.015, 0.4);
+  }
+
   MN.Render = {
     CELL_ASPECT,
     pickAspect,
     layout: computeLayout,
     paint,
+    titleSizeCap,
     renderTo(ctx, W, st, opts) {
       const lay = computeLayout(W, st);
       if (ctx.canvas.width !== lay.W || ctx.canvas.height !== lay.H) {
