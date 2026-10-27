@@ -189,8 +189,8 @@
 
     const title = ((st.header && st.header.title) || '').trim();
     const meta = ((st.header && st.header.meta) || '').trim();
-    const hasHead = !noBase && (!st.canvas || st.canvas.header !== false) &&
-      !!(title || meta || st.folderName);
+    // 只有真正会画内容时才留出标题栏：标题留空且没有相关信息时，不占顶部空间
+    const hasHead = !noBase && (!st.canvas || st.canvas.header !== false) && !!(title || meta);
 
     // 标题栏高度（比上一版收窄 1/3：0.152 → 0.101），标题与相关信息都居中在这一条里
     const headerH = hasHead ? W * 0.101 : 0;
@@ -493,7 +493,8 @@
     const x0 = lay.margin;
     const x1 = W - lay.margin;
     const rowW = x1 - x0;                 // 标题栏可用总宽
-    const title = (st.header.title || st.folderName || '').trim();
+    // 大标题只认用户自己填的内容，留空就不画（不回退成素材/文件夹名）
+    const title = (st.header.title || '').trim();
     const metaLines = (st.header.meta || '').split('\n').map((s) => s.trim()).filter(Boolean);
     if (!title && !metaLines.length) return;
 
@@ -554,7 +555,8 @@
 
     /* ---- 标题：目标字号（用户设定）→ 仅在放不下时才缩 ---- */
     const wantTs = T.size > 0 ? W * T.size : areaH * 0.64;    // 未设定时按标题栏高度自适应
-    if (!title) return;
+    // 标题留空时什么都不画，但「相关信息」仍要照常显示，所以这里不能直接 return
+    if (title) {
 
     // 水平可用的最大宽度：从锚点这一侧到「相关信息左侧」（或整行）
     const gapX = W * 0.02;
@@ -629,6 +631,7 @@
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
     drawSpaced(ctx, title, tx, ty, tSp, 'left');
+    }
 
     // 相关信息：位置可换九宫格，字号/颜色可调，行距跟随字号
     if (metaLines.length && metaBox) {
@@ -821,7 +824,7 @@
     const W = 800;
     const lay = computeLayout(W, st);
     if (!lay.hasHead || !lay.headerH) return 0.16;
-    const title = (st.header.title || st.folderName || '').trim() || '素材预览';
+    const title = (st.header.title || '').trim() || '素材预览';
     const areaTop = lay.headerTop;
     const areaBottom = areaTop + lay.headerH;
     const limit = W - lay.margin * 2;                  // 横向可用
