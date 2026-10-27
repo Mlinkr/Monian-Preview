@@ -554,8 +554,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:5px}
     border-bottom:1px solid var(--line);
     background:#0a0a0d;
   }
-  /* 移动端没有素材时不占位，直接隐藏预览区 */
-  .stage.is-empty{display:none}
+  .stage.is-empty{height:34dvh}
   .stage-wrap{padding:10px;align-items:flex-start}
   #btnFit{display:none}
   .stage-canvas{margin:0 auto}
