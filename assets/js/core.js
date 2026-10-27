@@ -123,12 +123,13 @@
         // 主题转亮：以前留下的深色默认底色换成浅色默认（用户自己选过的颜色不动）
         if (out.canvas && /^#(0f0f14|08080b|0a0a0d)$/i.test(out.canvas.color || '')) out.canvas.color = DEFAULT_STATE.canvas.color;
         // 主题转亮：底图是浅色却还留着纯白水印（早期默认）的，换成深墨色，否则看不见
+        // 只转换「仍是旧默认白」的，用户自己选过的颜色不动
         const lightBase = !out.canvas || !out.canvas.color || /^#(f2efe8|ffffff|fff|f5f5f5|fafafa)$/i.test(out.canvas.color);
-        if (lightBase && out.autoWm) {
-          for (const k in out.autoWm) {
-            const a = out.autoWm[k];
-            if (a && /^#fff(fff)?$/i.test(a.color || '')) a.color = '#1d1a15';
-          }
+        if (lightBase) {
+          const fixInk = (o) => { if (o && /^#fff(fff)?$/i.test(o.color || '')) o.color = '#1d1a15'; };
+          if (out.autoWm) for (const k in out.autoWm) fixInk(out.autoWm[k]);
+          (out.wmPer || []).forEach((w) => { if (w && w.kind !== 'image') fixInk(w); });
+          (out.wmGlobal || []).forEach((w) => { if (w && w.kind !== 'image') fixInk(w); });
         }
         return out;
       } catch (e) {
