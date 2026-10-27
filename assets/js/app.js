@@ -97,12 +97,19 @@
   }
 
   function drawPreview() {
+    const stageEl = el.stageWrap.closest('.stage');
+    if (stageEl) stageEl.classList.toggle('is-empty', !state.files.length);
+
     if (!state.files.length) {
       el.stageCanvas.hidden = true;
       el.empty.hidden = false;
       el.stageMeta.textContent = '等待素材…';
+      $('#btnExport').disabled = true;
+      $('#btnCopy').disabled = true;
       return;
     }
+    $('#btnExport').disabled = false;
+    $('#btnCopy').disabled = false;
     el.stageCanvas.hidden = false;
     el.empty.hidden = true;
 
@@ -231,7 +238,7 @@
     if (!state.dateText) state.dateText = U.fmtDate(Date.now());
 
     // 排序
-    arr.sort((a, b) => U.collator.compare(a.name, b.name));
+    arr.sort((a, b) => U.collator.compare(a.webkitRelativePath || a.name, b.webkitRelativePath || b.name));
 
     const limit = 80;
     const list = arr.slice(0, limit);
@@ -522,7 +529,10 @@
       state.template.aspect = r.w / r.h;
       syncTemplateUI();
       scheduleRender();
-    } catch (e) { state.template = null; }
+    } catch (e) {
+      state.template = null;
+      syncTemplateUI();
+    }
   })();
 
   /* ---------------- 版式控件 ---------------- */
@@ -791,7 +801,7 @@
   if (!supportsDir) {
     el.btnFolder.style.display = 'none';
     $('.dz-title').textContent = '点击选择图片，或直接拖入';
-    $('.dz-sub').textContent = '当前浏览器不支持选文件夹，选择图片后请手动填写素材名称';
+    $('.dz-sub').textContent = '当前浏览器不支持选文件夹，请多选图片后手动填写素材名称';
   }
 
   syncUI();

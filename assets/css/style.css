@@ -475,7 +475,9 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border:none;border-ra
     box-shadow:0 14px 30px rgba(0,0,0,.5);
     background:#0a0a0d;
   }
+  .stage.is-empty{height:34dvh}
   .stage-wrap{padding:10px;align-items:flex-start}
+  #btnFit{display:none}
   .stage-canvas{margin:0 auto}
   .stage-canvas canvas{width:auto;max-width:100%;margin:0 auto}
   .stage-bar{height:48px;padding:0 12px}
