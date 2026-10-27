@@ -431,6 +431,38 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:5px}
 .check{display:flex;align-items:center;gap:7px;margin-top:11px;font-size:11.5px;color:var(--dim);cursor:pointer}
 .check input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
 
+/* ---------- 标题 / 相关信息 样式 ---------- */
+.head-style{
+  margin-top:8px;padding:8px 9px 7px;
+  border:1px dashed var(--line-2);border-radius:9px;background:var(--card-2);
+}
+.hs-line{display:flex;align-items:center;gap:7px;margin-top:6px}
+.hs-line:first-child{margin-top:0}
+.hs-label{flex:none;font-size:10.5px;color:var(--dim-2);width:26px}
+.hs-line select{
+  width:auto;flex:none;min-width:70px;padding:3px 20px 3px 7px;font-size:11px;border-radius:6px;
+  background-position:right 6px center;background-color:#fff;
+}
+.hs-color{
+  width:20px;height:20px;flex:none;padding:0;border-radius:50%;
+  border:1px solid rgba(28,25,20,.18);background:none;cursor:pointer;
+  appearance:none;-webkit-appearance:none;
+}
+.hs-color::-webkit-color-swatch-wrapper{padding:0}
+.hs-color::-webkit-color-swatch{border:none;border-radius:50%}
+.hs-color::-moz-color-swatch{border:none;border-radius:50%}
+.hs-reset{
+  margin-left:auto;flex:none;border:1px solid var(--line-2);background:#fff;color:var(--dim-2);
+  border-radius:6px;padding:3px 8px;font-size:10.5px;cursor:pointer;transition:.18s;white-space:nowrap;
+}
+.hs-reset:hover{color:var(--accent);border-color:rgba(154,116,52,.45)}
+.hs-line input[type=range]{flex:1;min-width:0;height:16px}
+.hs-line input[type=range]::-webkit-slider-thumb{width:11px;height:11px;margin-top:-4px}
+.hs-line output{
+  flex:none;width:40px;text-align:right;font-family:ui-monospace,Menlo,monospace;
+  font-size:10px;color:var(--dim-2);
+}
+
 /* ---------- 快捷版式 ---------- */
 .quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:6px}
 .quick-grid button{

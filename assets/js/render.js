@@ -420,23 +420,25 @@
         ctx.textAlign = align;
         ctx.textBaseline = 'alphabetic';
         const op = U.clamp(ln.op, 0, 1);
-        // 透明度就是透明度：直接用原值，保证拖动多少就变多少（线性一一对应）
-        // 阴影只为「提高可读性」，必须严格跟随透明度衰减，否则等于给字加了一层不透的底
-        // 深色字（浅底图）用浅色光晕，浅色字（深底图）用深色投影，两边都不会糊
-        const shOp = 0.45 * op;
-        ctx.shadowColor = isLightColor(ln.color) ? `rgba(0,0,0,${shOp.toFixed(4)})` : `rgba(255,255,255,${(shOp * 0.9).toFixed(4)})`;
-        ctx.shadowBlur = Math.max(0.5, ln.fs * 0.3 * op);
-        ctx.shadowOffsetY = Math.max(0.3, ln.fs * 0.03);
+        // 透明度就是透明度：整块字一起变透明，不加任何阴影/光晕/描边
+        // （阴影会把字和底色混成灰白，等于给字「提亮」了，不是真实的透明效果）
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
         ctx.globalAlpha = op;
         ctx.fillStyle = ln.color || '#ffffff';
         ctx.fillText(ln.text, x, baseline);
         ctx.globalAlpha = 1;
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetY = 0;
         y += ln.lh;
       }
     }
+  }
+
+  /* 两个矩形是否相交（pad 用于留安全间隙） */
+  function rectsOverlap(x, y, w, h, box, pad) {
+    const p = pad == null ? 0 : pad;
+    return !(x + w + p <= box.x || box.x + box.w + p <= x ||
+             y + h + p <= box.y || box.y + box.h + p <= y);
   }
 
   /* ---------------- 背景 / 标题 ---------------- */
@@ -448,6 +450,12 @@
     return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.6;
   }
 
+  const H_ANCHORS = {
+    tl: [0, 0], tc: [0.5, 0], tr: [1, 0],
+    ml: [0, 0.5], mc: [0.5, 0.5], mr: [1, 0.5],
+    bl: [0, 1], bc: [0.5, 1], br: [1, 1],
+  };
+
   function paintHeader(ctx, lay, st) {
     const W = lay.W;
     const x0 = lay.margin;
@@ -457,45 +465,121 @@
     if (!title && !metaLines.length) return;
 
     const light = isLightColor(st.canvas && st.canvas.color);
-    const ink = light ? 'rgba(22,22,28,.94)' : '#f4f1ea';
-    const ink2 = light ? 'rgba(22,22,28,.86)' : 'rgba(240,240,246,.92)';
-    const ink3 = light ? 'rgba(22,22,28,.5)' : 'rgba(255,255,255,.55)';
+    const H = st.header || {};
+    const T = H.titleStyle || {};
+    const M = H.metaStyle || {};
+
+    // 颜色：用户选过就用用户的，没选过按底图明暗自动
+    const ink = T.color || (light ? '#16161c' : '#f4f1ea');
+    const mInk = M.color || (light ? 'rgba(22,22,28,.88)' : 'rgba(240,240,246,.92)');
     const lineColor = light ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.09)';
     const accent = light ? 'rgba(158,116,54,.8)' : 'rgba(216,177,117,.6)';
 
-    // 标题
+    const areaTop = lay.headerTop;
+    const areaH = lay.headerH;
+    const areaBottom = areaTop + areaH;
+
+    // 标题位置：九宫格（在标题栏区域内的锚点）+ 百分比微调
+    const tAnchor = H_ANCHORS[T.anchor || 'ml'] || H_ANCHORS.ml;
+    const tDx = +T.dx || 0;
+    const tDy = +T.dy || 0;
+
+    // 标题字号：auto 时按标题栏高度自适应，并按可用宽度自动缩小
+    let ts = T.size > 0 ? W * T.size : W * 0.047;
+    const wantTs = ts;                                    // 用户期望的字号，只在不重叠时才缩
+    const metaW = metaLines.length ? W * 0.34 : 0;
+    const maxTitleW = Math.max(W * 0.12, (x1 - x0) - metaW - W * 0.02);
+    setFont(ctx, ts, 600);
+    let tw = measure(ctx, title).w;
+    if (tw > maxTitleW) { ts = Math.max(W * 0.016, ts * (maxTitleW / tw)); }
+    const fitTs = ts;                                     // 仅按整行宽度缩过的字号
+    setFont(ctx, ts, 600);
+    tw = title ? measure(ctx, title).w : 0;
+
+    // 相关信息先算包围盒：标题要与它自动避让，避免两者叠在一起
+    let metaBox = null;
+    if (metaLines.length) {
+      const mfs = M.size > 0 ? W * M.size : W * 0.0152;
+      const mlh = mfs * (M.lh || 1.62);
+      const mTotal = (metaLines.length - 1) * mlh;
+      const mAnchor = H_ANCHORS[M.anchor || 'mr'] || H_ANCHORS.mr;
+      let mMaxW = 0;
+      metaLines.forEach((line) => { setFont(ctx, mfs, 400); mMaxW = Math.max(mMaxW, measure(ctx, line).w); });
+      let mbx = x0 + ((x1 - x0) - mMaxW) * mAnchor[0];
+      let mby = areaTop + (areaH - (mTotal + mfs)) * mAnchor[1] + mfs * 0.12;
+      mbx += ((x1 - x0) * (+M.dx || 0)) / 100;
+      mby += (areaH * (+M.dy || 0)) / 100;
+      mbx = U.clamp(mbx, x0, Math.max(x0, x1 - mMaxW));
+      mby = U.clamp(mby, areaTop, Math.max(areaTop, areaBottom - (mTotal + mfs)));
+      metaBox = { x: mbx, y: mby, w: mMaxW, h: mTotal + mfs };
+    }
+
     if (title) {
-      const maxTitleW = W * (metaLines.length ? 0.56 : 0.9) - lay.margin * 2;
-      let ts = W * 0.047;
-      setFont(ctx, ts, 600);
-      let tw = measure(ctx, title).w;
-      if (tw > maxTitleW) { ts = Math.max(W * 0.022, ts * (maxTitleW / tw)); setFont(ctx, ts, 600); }
+      const th = ts;
+      let tx = x0 + ((x1 - x0) - tw) * tAnchor[0];
+      let ty = areaTop + (areaH - th) * tAnchor[1] + th * 0.86;
+      tx += ((x1 - x0) * tDx) / 100;
+      ty += (areaH * tDy) / 100;
+      // 夹在画布内，避免拖出画面
+      tx = U.clamp(tx, x0, Math.max(x0, x1 - tw));
+      ty = U.clamp(ty, areaTop + th * 0.8, areaBottom);
+
+      // 与相关信息重叠时：优先「缩到并排的可用宽度」，其次往下让，最后往左让
+      if (metaBox && rectsOverlap(tx, ty - th * 0.86, tw, th * 1.05, metaBox, W * 0.012)) {
+        const room = metaBox.x - x0 - W * 0.03;           // 左侧可用宽度（含安全间隙）
+        const belowRoom = areaBottom + th * 0.2 - (metaBox.y + metaBox.h); // 下方可用高度
+        const leftRightAligned = tAnchor[0] === 0;        // 左对齐时不该额外缩
+
+        // 第一优先：保持用户要的字号——直接放到相关信息左侧（够宽才这么做）
+        setFont(ctx, wantTs, 600);
+        const wantTw = measure(ctx, title).w;
+        if (wantTw <= room) {
+          ts = wantTs; tw = wantTw;
+          setFont(ctx, ts, 600);
+          tx = x0 + (room - tw) * tAnchor[0];
+        } else if (!leftRightAligned && room >= W * 0.14) {
+          // 第二优先：缩到刚好能并排，仍保持用户选的锚点方向
+          ts = Math.max(W * 0.014, fitTs * (room / measure(ctx, title).w));
+          setFont(ctx, ts, 600);
+          tw = measure(ctx, title).w;
+          tx = x0 + (room - tw) * tAnchor[0];
+        } else if (belowRoom >= th * 1.15) {
+          ty = metaBox.y + metaBox.h + th * 0.95;         // 放不下就往相关信息下方挪
+        } else {
+          setFont(ctx, fitTs, 600);
+          tw = measure(ctx, title).w;
+          ts = fitTs;
+          tx = Math.max(x0, metaBox.x - W * 0.014 - tw);  // 最后兜底：整体左移
+        }
+      }
 
       ctx.fillStyle = ink;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
-      const baseline = lay.headerTop + lay.headerH * 0.615;
-      drawSpaced(ctx, title, x0, baseline, W * 0.0016, 'left');
+      drawSpaced(ctx, title, tx, ty, (T.spacing == null ? W * 0.0016 : W * T.spacing), 'left');
     }
 
-    // 右侧信息
-    if (metaLines.length) {
-      const fs = W * 0.0152;
-      const lh = fs * 1.62;
-      const total = (metaLines.length - 1) * lh;
-      let y = lay.headerTop + (lay.headerH - total) / 2 + fs * 0.3;
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'alphabetic';
+    // 相关信息：位置可换九宫格，字号/颜色可调，行距跟随字号
+    if (metaLines.length && metaBox) {
+      const fs = M.size > 0 ? W * M.size : W * 0.0152;
+      const lh = fs * (M.lh || 1.62);
+      const mAnchor = H_ANCHORS[M.anchor || 'mr'] || H_ANCHORS.mr;
+      const bx = metaBox.x, by = metaBox.y, maxW = metaBox.w;
+      const align = mAnchor[0] === 0 ? 'left' : mAnchor[0] === 1 ? 'right' : 'center';
+      const ax = align === 'left' ? bx : align === 'right' ? bx + maxW : bx + maxW / 2;
       metaLines.forEach((line, i) => {
         setFont(ctx, fs, i === 0 ? 500 : 400);
-        ctx.fillStyle = i === 0 ? ink2 : ink3;
-        ctx.fillText(line, x1, y);
-        y += lh;
+        ctx.fillStyle = mInk;
+        ctx.globalAlpha = i === 0 ? 1 : 0.82;
+        ctx.textAlign = align;
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(line, ax, by + i * lh + fs);
       });
+      ctx.globalAlpha = 1;
     }
 
     // 分隔线 + 金色短标记
-    const ly = lay.headerTop + lay.headerH;
+    const ly = areaBottom;
     const lw = Math.max(1, W * 0.0006);
     ctx.fillStyle = lineColor;
     ctx.fillRect(x0, ly, x1 - x0, lw);

@@ -897,6 +897,111 @@
     return state.canvas;
   }
 
+  /* ---- 标题 / 相关信息 的样式与位置 ---- */
+  function headCfg() {
+    if (!state.header) state.header = { title: '', meta: '' };
+    const h = state.header;
+    if (!h.titleStyle) h.titleStyle = { anchor: 'ml', dx: 0, dy: 0, size: 0, color: '', spacing: null };
+    if (!h.metaStyle) h.metaStyle = { anchor: 'mr', dx: 0, dy: 0, size: 0, color: '' };
+    return h;
+  }
+
+  function styleOf(which) {
+    const h = headCfg();
+    return which === 'meta' ? h.metaStyle : h.titleStyle;
+  }
+
+  // 底图明暗决定「自动色」的默认值，用于色点回显
+  function autoInk() {
+    const c = String((state.canvas && state.canvas.color) || '#f2efe8').replace('#', '');
+    const hex = c.length === 3 ? c.split('').map((x) => x + x).join('') : c;
+    const r = parseInt(hex.slice(0, 2), 16) || 0;
+    const g = parseInt(hex.slice(2, 4), 16) || 0;
+    const b = parseInt(hex.slice(4, 6), 16) || 0;
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.6 ? '#16161c' : '#f4f1ea';
+  }
+
+  function fmtSigned(v) {
+    const n = Math.round(+v || 0);
+    return (n > 0 ? '+' : '') + n + '%';
+  }
+
+  function syncHeadStyleUI() {
+    const h = headCfg();
+    [['title', h.titleStyle], ['meta', h.metaStyle]].forEach(([which, st]) => {
+      const box = which === 'meta' ? $('#metaStyleBox') : $('#titleStyleBox');
+      if (!box) return;
+      const anchorSel = box.querySelector('.hs-anchor');
+      const colorInp = box.querySelector('.hs-color');
+      const sizeInp = box.querySelector('.hs-size');
+      const dxInp = box.querySelector('.hs-dx');
+      const dyInp = box.querySelector('.hs-dy');
+      if (anchorSel) anchorSel.value = st.anchor || (which === 'meta' ? 'mr' : 'ml');
+      if (colorInp) colorInp.value = st.color || autoInk();
+      if (sizeInp) {
+        const def = which === 'meta' ? 0.0152 : 0.047;
+        sizeInp.value = st.size > 0 ? st.size : def;
+      }
+      if (dxInp) dxInp.value = +st.dx || 0;
+      if (dyInp) dyInp.value = +st.dy || 0;
+      const sizeOut = box.querySelector('.hs-size ~ output, output');
+      const outs = box.querySelectorAll('output');
+      if (outs[0]) outs[0].textContent = st.size > 0 ? (st.size * 100).toFixed(1) : '自动';
+      if (outs[1]) outs[1].textContent = fmtSigned(st.dx);
+      if (outs[2]) outs[2].textContent = fmtSigned(st.dy);
+      // 颜色是否被用户改过：没改过时标注「自动」
+      if (colorInp) colorInp.title = st.color ? '自定义颜色' : '自动（跟随底图明暗）';
+    });
+  }
+
+  function bindHeadStyle() {
+    ['titleStyleBox', 'metaStyleBox'].forEach((id) => {
+      const box = document.getElementById(id);
+      if (!box) return;
+      const which = id === 'metaStyleBox' ? 'meta' : 'title';
+
+      box.addEventListener('change', (e) => {
+        const t = e.target;
+        const st = styleOf(which);
+        if (t.classList.contains('hs-anchor')) { st.anchor = t.value; }
+        else if (t.classList.contains('hs-color')) { st.color = t.value; }
+        else return;
+        syncHeadStyleUI();
+        commit(true);
+      });
+
+      box.addEventListener('input', (e) => {
+        const t = e.target;
+        const st = styleOf(which);
+        if (t.classList.contains('hs-color')) { st.color = t.value; }
+        else if (t.classList.contains('hs-size')) {
+          st.size = +t.value;
+          const o = box.querySelectorAll('output')[0];
+          if (o) o.textContent = (+t.value * 100).toFixed(1);
+        } else if (t.classList.contains('hs-dx')) {
+          st.dx = +t.value;
+          const o = box.querySelectorAll('output')[1];
+          if (o) o.textContent = fmtSigned(t.value);
+        } else if (t.classList.contains('hs-dy')) {
+          st.dy = +t.value;
+          const o = box.querySelectorAll('output')[2];
+          if (o) o.textContent = fmtSigned(t.value);
+        } else return;
+        commit();
+      });
+
+      box.addEventListener('click', (e) => {
+        const b = e.target.closest('.hs-reset');
+        if (!b) return;
+        const st = styleOf(which);
+        st.anchor = which === 'meta' ? 'mr' : 'ml';
+        st.dx = 0; st.dy = 0; st.size = 0; st.color = '';
+        syncHeadStyleUI();
+        commit(true);
+      });
+    });
+  }
+
   function syncBaseUI() {
     const c = canvasCfg();
     const mode = c.mode || 'solid';
@@ -908,6 +1013,7 @@
     el.baseColor.value = c.color || '#f2efe8';
     el.showHead.checked = c.header !== false;
     el.headFields.hidden = !el.showHead.checked;
+    syncHeadStyleUI();
     $$('button', el.swatches).forEach((b) => {
       b.classList.toggle('on', (b.dataset.c || '').toLowerCase() === String(c.color || '').toLowerCase());
     });
@@ -967,6 +1073,8 @@
     el.headFields.hidden = !e.target.checked;
     commit(true);
   });
+
+  bindHeadStyle();
 
   el.tplDrop.addEventListener('click', () => el.inputTpl.click());
 

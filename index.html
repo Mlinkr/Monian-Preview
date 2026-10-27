@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Monian">
 <link rel="stylesheet" href="assets/fonts/font.css?v=2">
-<link rel="stylesheet" href="assets/css/style.css?v=18">
+<link rel="stylesheet" href="assets/css/style.css?v=19">
 </head>
 <body>
 
@@ -136,9 +136,64 @@
               <label for="headerTitle">大标题</label>
               <input type="text" id="headerTitle" placeholder="留空则使用素材名称">
             </div>
+            <div class="head-style" id="titleStyleBox">
+              <div class="hs-line">
+                <span class="hs-label">标题</span>
+                <select class="hs-anchor" data-target="title" title="标题位置">
+                  <option value="tl">左上</option><option value="tc">正上</option><option value="tr">右上</option>
+                  <option value="ml" selected>左中</option><option value="mc">正中</option><option value="mr">右中</option>
+                  <option value="bl">左下</option><option value="bc">正下</option><option value="br">右下</option>
+                </select>
+                <input type="color" class="hs-color" data-target="title" value="#16161c" title="标题颜色">
+                <button class="hs-reset" data-target="title" type="button">归位</button>
+              </div>
+              <div class="hs-line">
+                <span class="hs-label">字号</span>
+                <input type="range" id="titleSize" min="0.015" max="0.08" step="0.001" class="hs-size" data-target="title">
+                <output id="titleSizeOut">自动</output>
+              </div>
+              <div class="hs-line">
+                <span class="hs-label">左右</span>
+                <input type="range" id="titleDx" min="-40" max="40" step="1" class="hs-dx" data-target="title">
+                <output id="titleDxOut">0%</output>
+              </div>
+              <div class="hs-line">
+                <span class="hs-label">上下</span>
+                <input type="range" id="titleDy" min="-40" max="40" step="1" class="hs-dy" data-target="title">
+                <output id="titleDyOut">0%</output>
+              </div>
+            </div>
+
             <div class="row align-start">
-              <label for="headerMeta">右上角信息</label>
+              <label for="headerMeta">相关信息</label>
               <textarea id="headerMeta" rows="3" placeholder="每行一条，如：&#10;价格 xxx&#10;联系方式 xxx..."></textarea>
+            </div>
+            <div class="head-style" id="metaStyleBox">
+              <div class="hs-line">
+                <span class="hs-label">信息</span>
+                <select class="hs-anchor" data-target="meta" title="相关信息位置">
+                  <option value="tl">左上</option><option value="tc">正上</option><option value="tr">右上</option>
+                  <option value="ml">左中</option><option value="mc">正中</option><option value="mr" selected>右中</option>
+                  <option value="bl">左下</option><option value="bc">正下</option><option value="br">右下</option>
+                </select>
+                <input type="color" class="hs-color" data-target="meta" value="#16161c" title="信息文字颜色">
+                <button class="hs-reset" data-target="meta" type="button">归位</button>
+              </div>
+              <div class="hs-line">
+                <span class="hs-label">字号</span>
+                <input type="range" id="metaSize" min="0.008" max="0.04" step="0.0005" class="hs-size" data-target="meta">
+                <output id="metaSizeOut">自动</output>
+              </div>
+              <div class="hs-line">
+                <span class="hs-label">左右</span>
+                <input type="range" id="metaDx" min="-40" max="40" step="1" class="hs-dx" data-target="meta">
+                <output id="metaDxOut">0%</output>
+              </div>
+              <div class="hs-line">
+                <span class="hs-label">上下</span>
+                <input type="range" id="metaDy" min="-40" max="40" step="1" class="hs-dy" data-target="meta">
+                <output id="metaDyOut">0%</output>
+              </div>
             </div>
           </div>
         </div>
@@ -280,7 +335,8 @@
         <li><b>用占位符</b>：<code>{folder}</code> 素材名称、<code>{date}</code> 日期、<code>{index}</code> 序号、<code>{count}</code> 总张数。</li>
         <li><b>看透明度</b>：文字「透明」滑条右边的小色块会跟着一起变淡，那就是水印在底图上的实际深浅；数值与效果是线性的，拖到一半就是一半。</li>
         <li><b>水印颜色</b>：底图是浅色时默认给深墨色，深色底图默认白色；想改就点左边的圆形色点。</li>
-        <li><b>选底图</b>：默认「纯色底图」，可自选颜色并填写标题、右上角信息；也可上传自己设计好的底图，用「图片放置区域」框出空白处；选「无底图」则图片直接拼接。</li>
+        <li><b>选底图</b>：默认「纯色底图」，可自选颜色并填写大标题与相关信息；也可上传自己设计好的底图，用「图片放置区域」框出空白处；选「无底图」则图片直接拼接。</li>
+        <li><b>标题与相关信息</b>：两行文字各自有独立的「位置（九宫格）、颜色、字号、左右/上下微调」，点「归位」恢复默认；两者重叠时标题会自动让位或适度缩小，不会糊在一起。</li>
         <li><b>调位置</b>：水印点「位置」后可切换「九宫格」（左上、右下等固定位置，再用滑条微调）或「自由定位」（横向、纵向百分比滑条，想放哪就放哪）。</li>
         <li><b>调整版式</b>：列数决定上下拼接还是多列网格，右侧会实时预览；03、04 两张卡片点标题可以收起，收起后能看到更多内容（状态会被记住）。</li>
         <li><b>导出</b>：选择宽度与格式后保存。所有处理都在本机完成，图片不会上传。</li>
@@ -292,7 +348,7 @@
 </div>
 
 <script src="assets/js/core.js?v=13"></script>
-<script src="assets/js/render.js?v=15"></script>
-<script src="assets/js/app.js?v=15"></script>
+<script src="assets/js/render.js?v=16"></script>
+<script src="assets/js/app.js?v=16"></script>
 </body>
 </html>
