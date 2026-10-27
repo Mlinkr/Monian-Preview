@@ -61,13 +61,15 @@
     folderName: '',
     dateText: '',
     priceText: '',
-    // 水印条目有两种 kind：
-    //   text  —— { text, anchor, size, opacity, weight, color, free, px, py, dx, dy }
-    //   image —— { kind:'image', img(内存), name, mode:'tile'|'single', opacity, scale, tile, anchor, ... }
-    wmPer: [
-      { id: 'd1', kind: 'text', text: '{folder}', anchor: 'bl', size: 1.35, opacity: 0.95, weight: 600, color: '#ffffff' },
-      { id: 'd2', kind: 'text', text: '{date}', anchor: 'bl', size: 0.85, opacity: 0.72, weight: 400, color: '#ffffff' },
-    ],
+    // 01 卡片的「自动水印」：名称 / 日期 / 张数，样式在 01 内直接调整
+    autoWm: {
+      folder: { on: true, anchor: 'bl', size: 1.15, opacity: 0.95, weight: 600, color: '#ffffff', dx: 0, dy: 0 },
+      date: { on: true, anchor: 'bl', size: 0.8, opacity: 0.7, weight: 400, color: '#ffffff', dx: 0, dy: -16 },
+      count: { on: false, anchor: 'br', size: 0.8, opacity: 0.7, weight: 400, color: '#ffffff', dx: 0, dy: -16 },
+    },
+    countText: '',
+    // 02 卡片：用户手动加的水印（文字 / 图片），不再自动塞占位符
+    wmPer: [],
     wmGlobal: [],
     header: {
       title: '',

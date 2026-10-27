@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="拼图预览">
 <link rel="stylesheet" href="assets/fonts/font.css?v=2">
-<link rel="stylesheet" href="assets/css/style.css?v=8">
+<link rel="stylesheet" href="assets/css/style.css?v=9">
 </head>
 <body>
 
@@ -65,6 +65,12 @@
             <label for="dateText">日期</label>
             <input type="text" id="dateText" placeholder="如 20261027">
           </div>
+          <div class="row">
+            <label for="countText">张数</label>
+            <input type="text" id="countText" placeholder="如 4（导入后自动填）">
+          </div>
+          <p class="auto-tip">以下水印随上面的内容联动，点一下开/关，均支持占位符 <code>{folder}</code> <code>{date}</code> <code>{count}</code> <code>{index}</code></p>
+          <div id="autoWmBox"></div>
         </div>
 
         <div class="thumbs" id="thumbs"></div>
@@ -88,10 +94,10 @@
         <div class="wm-list" id="wmList"></div>
         <div class="wm-add-row">
           <button class="btn btn-ghost" id="btnWmAdd" type="button">＋ 添加文字水印</button>
-          <button class="btn btn-ghost" id="btnWmImg" type="button">＋ 添加花纹图</button>
+          <button class="btn btn-ghost" id="btnWmImg" type="button">＋ 添加图片水印</button>
         </div>
         <input type="file" id="inputWmImg" accept="image/png,image/webp,image/*" hidden>
-        <p class="tip">花纹图用 PNG 透明底（半透明条纹、水印图案），会自动平铺在图片上，可调尺寸与透明度。</p>
+        <p class="tip">图片水印支持 PNG 等透明底素材：与素材同为 16:9 的图会自动铺满每张图；其他比例可平铺或单张摆放，调尺寸、透明度、旋转。</p>
         <p class="tip">支持占位符：<code>{folder}</code> 名称 · <code>{date}</code> 时间 · <code>{index}</code> 序号 · <code>{count}</code> 张数</p>
         <div class="wm-foot">
           <button class="link" id="btnWmDefault" type="button">恢复推荐配置</button>
@@ -283,8 +289,8 @@
   </div>
 </div>
 
-<script src="assets/js/core.js?v=7"></script>
-<script src="assets/js/render.js?v=7"></script>
-<script src="assets/js/app.js?v=7"></script>
+<script src="assets/js/core.js?v=8"></script>
+<script src="assets/js/render.js?v=8"></script>
+<script src="assets/js/app.js?v=8"></script>
 </body>
 </html>

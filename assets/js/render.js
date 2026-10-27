@@ -216,6 +216,13 @@
     ctx.save();
     ctx.globalAlpha = op;
 
+    // 16:9 图片水印：等比缩放铺满整个区域（cover），与素材完全对齐
+    if (it.fitCell) {
+      drawCover(ctx, it.img, iw, ih, rect.x, rect.y, rect.w, rect.h);
+      ctx.restore();
+      return;
+    }
+
     const tile = it.mode !== 'single';
 
     if (tile) {
@@ -453,6 +460,23 @@
     ctx.fillRect(x0, ly, W * 0.05, lw);
   }
 
+  /* ---------------- 01 自动水印（名称 / 日期 / 张数） ---------------- */
+  function autoItems(st) {
+    const A = st.autoWm || {};
+    const out = [];
+    const mk = (key, text) => {
+      const a = A[key];
+      if (!a || !a.on) return;
+      const t = String(text == null ? '' : text).trim();
+      if (!t) return;
+      out.push({ kind: 'text', text: t, anchor: a.anchor || 'bl', size: a.size || 1, opacity: a.opacity == null ? 0.9 : a.opacity, weight: a.weight || 400, color: a.color || '#ffffff', dx: a.dx || 0, dy: a.dy || 0 });
+    };
+    mk('folder', st.folderName);
+    mk('date', st.dateText);
+    mk('count', st.countText);
+    return out;
+  }
+
   /* ---------------- 主绘制 ---------------- */
   function paint(ctx, lay, st, opts) {
     const { W, H } = lay;
@@ -472,7 +496,8 @@
 
     // 每张图
     const n = st.files.length;
-    const hasTextWm = (st.wmPer || []).some((w) => !isImageItem(w) && w.text && w.text.trim());
+    const hasTextWm = autoItems(st).length > 0 ||
+      (st.wmPer || []).some((w) => !isImageItem(w) && w.text && w.text.trim());
     for (const cell of lay.cells) {
       const f = st.files[cell.i];
       ctx.save();
@@ -512,7 +537,7 @@
         index: `${U.pad2(cell.i + 1)}/${U.pad2(n)}`,
         count: n,
       };
-      drawWatermarkGroup(ctx, st.wmPer, cell, cell.w * 0.042, vars, 1.5);
+      drawWatermarkGroup(ctx, autoItems(st).concat(st.wmPer || []), cell, cell.w * 0.042, vars, 1.5);
       ctx.restore();
 
       // 细边框
