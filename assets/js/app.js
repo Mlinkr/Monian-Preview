@@ -191,6 +191,8 @@
     el.fileCount.textContent = `${state.files.length} 张`;
     el.fileCount.classList.toggle('on', state.files.length > 0);
     el.assetInfo.hidden = state.files.length === 0;
+    const clearBtn = document.getElementById('btnClearFiles');
+    if (clearBtn) clearBtn.hidden = state.files.length === 0;
     if (state.files.length) {
       el.folderName.value = state.folderName || '';
       el.dateText.value = state.dateText || '';
@@ -207,6 +209,15 @@
     state.files.splice(i, 1);
     renderThumbs();
     commit();
+  });
+
+  // 一键清空全部素材
+  document.getElementById('btnClearFiles').addEventListener('click', () => {
+    state.files.forEach((f) => f.thumbUrl && URL.revokeObjectURL(f.thumbUrl));
+    state.files = [];
+    renderThumbs();
+    commit(true);
+    MN.toast('已清空全部素材');
   });
 
   /* ---------------- 文件读取 ---------------- */
@@ -253,9 +264,10 @@
     const parsed = parseFolder(state.folderName);
     if (parsed.name) state.folderName = parsed.name;
     if (parsed.date) {
+      // 文件夹名里带了日期，原样保留（如 20261027），不做任何格式化
       state.dateText = parsed.date;
-    } else {
-      // 没解析出日期则回退用文件最新修改时间
+    } else if (!state.dateText) {
+      // 没解析出日期、且用户尚未填过，才回退用文件最新修改时间
       const times = arr.map((f) => f.lastModified).filter((t) => t > 0);
       state.dateText = times.length ? U.fmtDate(Math.max(...times)) : U.fmtDate(Date.now());
     }
@@ -387,13 +399,12 @@
           <button class="wm-del" type="button" title="删除">×</button>
         </div>
         <div class="wm-item-bot">
-          <button class="wm-color-btn" type="button" title="文字颜色" style="--c:${U.esc(it.color || '#ffffff')}"></button>
-          <input type="color" class="wm-color" value="${U.esc(it.color || '#ffffff')}" title="文字颜色" hidden>
+          <input type="color" class="wm-color" value="${U.esc(it.color || '#ffffff')}" title="文字颜色">
           <select class="wm-anchor"${free ? ' disabled' : ''}>
             ${ANCHORS.map(([v, t]) => `<option value="${v}"${it.anchor === v ? ' selected' : ''}>${t}</option>`).join('')}
           </select>
           <div class="wm-slide"><span>字号</span><input type="range" class="wm-size" min="0.5" max="2.6" step="0.05" value="${it.size || 1}"></div>
-          <div class="wm-slide"><span>透明</span><input type="range" class="wm-op" min="0.05" max="1" step="0.05" value="${it.opacity == null ? 0.9 : it.opacity}"></div>
+          <div class="wm-slide"><span>透明</span><input type="range" class="wm-op" min="0.05" max="1" step="0.05" value="${it.opacity == null ? 0.9 : it.opacity}"><output class="wm-op-out">${Math.round((it.opacity == null ? 0.9 : it.opacity) * 100)}%</output></div>
           <button class="wm-pos-chip${open ? ' on' : ''}" type="button" title="自定义位置">位置</button>
         </div>
         <div class="wm-pos"${open ? '' : ' hidden'}>
@@ -432,7 +443,11 @@
     if (!it) return;
     if (e.target.classList.contains('wm-text')) it.text = e.target.value;
     else if (e.target.classList.contains('wm-size')) it.size = +e.target.value;
-    else if (e.target.classList.contains('wm-op')) it.opacity = +e.target.value;
+    else if (e.target.classList.contains('wm-op')) {
+      it.opacity = +e.target.value;
+      const out = item.querySelector('.wm-op-out');
+      if (out) out.textContent = Math.round(+e.target.value * 100) + '%';
+    }
     else if (e.target.classList.contains('wm-dx') || e.target.classList.contains('wm-dy')) {
       const isX = e.target.classList.contains('wm-dx');
       if (isX) it.dx = +e.target.value; else it.dy = +e.target.value;
@@ -502,12 +517,7 @@
       return;
     }
 
-    const colorBtn = e.target.closest('.wm-color-btn');
-    if (colorBtn) {
-      const c = item.querySelector('.wm-color');
-      if (c) c.click();
-      return;
-    }
+    // 取色器为原生 input[type=color]，点击即弹系统面板，无需额外处理
 
     const reset = e.target.closest('.wm-pos-reset');
     if (reset) {

@@ -320,10 +320,11 @@
 
         ctx.textAlign = align;
         ctx.textBaseline = 'alphabetic';
-        ctx.shadowColor = 'rgba(0,0,0,.62)';
+        const op = U.clamp(ln.op, 0, 1);
+        ctx.shadowColor = `rgba(0,0,0,${(0.62 * op).toFixed(3)})`;
         ctx.shadowBlur = Math.max(1, ln.fs * 0.42);
         ctx.shadowOffsetY = Math.max(0.5, ln.fs * 0.04);
-        ctx.globalAlpha = U.clamp(ln.op, 0, 1);
+        ctx.globalAlpha = op;
         ctx.fillStyle = ln.color || '#ffffff';
         ctx.fillText(ln.text, x, baseline);
         ctx.globalAlpha = 1;

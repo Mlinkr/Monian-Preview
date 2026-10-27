@@ -322,15 +322,18 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border:none;border-ra
 .wm-slide input[type=range]{height:16px}
 .wm-slide input[type=range]::-webkit-slider-thumb{width:11px;height:11px;margin-top:-4px}
 
-/* 水印颜色 */
-.wm-color-btn{
+/* 水印颜色：原生取色器做成圆形色点，点击必弹系统取色面板 */
+.wm-color{
   width:20px;height:20px;flex:none;padding:0;border-radius:50%;
   border:1px solid rgba(255,255,255,.28);
-  background:var(--c,#fff);cursor:pointer;
-  box-shadow:0 0 0 2px rgba(0,0,0,.25) inset;
+  background:none;cursor:pointer;appearance:none;-webkit-appearance:none;
   transition:transform .15s;
 }
-.wm-color-btn:hover{transform:scale(1.12)}
+.wm-color::-webkit-color-swatch-wrapper{padding:0}
+.wm-color::-webkit-color-swatch{border:none;border-radius:50%}
+.wm-color::-moz-color-swatch{border:none;border-radius:50%}
+.wm-color:hover{transform:scale(1.12)}
+.wm-slide output{font-size:10px;color:var(--dim-2);flex:none;min-width:30px;text-align:right}
 
 /* 自定义位置 */
 .wm-pos-chip{
