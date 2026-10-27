@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Monian · 账号管理</title>
+<style>
+  :root{--bg:#f4f2ee;--card:#fff;--ink:#1d1a15;--sub:#8b8275;--line:#e4ddd0;--accent:#9a7434;}
+  *{box-sizing:border-box;font-family:"PingFang SC","Microsoft YaHei",sans-serif;}
+  body{margin:0;background:linear-gradient(160deg,var(--bg),#ece8df);min-height:100vh;color:var(--ink);}
+  .wrap{max-width:720px;margin:0 auto;padding:36px 18px 60px;}
+  h1{font-size:20px;letter-spacing:.3em;margin:0 0 4px;text-align:center;}
+  .sub{text-align:center;font-size:12px;color:var(--sub);letter-spacing:.2em;margin-bottom:28px;}
+  .card{background:var(--card);border-radius:14px;padding:24px 22px;box-shadow:0 10px 30px rgba(29,26,21,.08);margin-bottom:18px;}
+  .card h2{font-size:15px;margin:0 0 14px;font-weight:600;}
+  input,button{font-size:14px;}
+  input{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:#faf9f6;color:var(--ink);}
+  input:focus{outline:none;border-color:var(--accent);}
+  .frow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .frow input{flex:1;min-width:120px;}
+  button.b{border:none;border-radius:8px;padding:11px 18px;background:var(--accent);color:#fff;cursor:pointer;letter-spacing:.1em;}
+  button.b:disabled{opacity:.5;cursor:default;}
+  button.ghost{border:1px solid var(--line);background:#fff;color:var(--sub);border-radius:8px;padding:9px 14px;cursor:pointer;}
+  .msg{min-height:18px;font-size:12px;margin-top:8px;color:#b4433a;white-space:pre-wrap;}
+  .msg.ok{color:#4a7c46;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);}
+  th{color:var(--sub);font-weight:500;font-size:12px;}
+  td .mini{border:none;background:none;color:var(--accent);cursor:pointer;font-size:12px;text-decoration:underline;padding:0;margin-right:10px;}
+  td .mini.del{color:#b4433a;}
+  .exp-old{color:#b4433a;}
+  .hint{font-size:12px;color:var(--sub);line-height:1.7;}
+  .hide{display:none;}
+  label.ck{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub);}
+  label.ck input{width:auto;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>MONIAN</h1>
+  <div class="sub">账 号 管 理 · 仅 管 理 员</div>
+
+  <!-- ① 管理令牌 -->
+  <div class="card" id="tokenCard">
+    <h2 id="tokenTitle">输入管理令牌</h2>
+    <div class="frow"><input id="tk" type="password" placeholder="管理令牌（只有你知道）"></div>
+    <div class="frow hide" id="tkConfirmRow"><input id="tk2" type="password" placeholder="再输入一次确认"></div>
+    <button class="b" id="tkBtn">进入</button>
+    <div class="hint hide" id="firstHint" style="margin-top:12px">
+      首次使用：上面设置一个只有你知道的管理令牌（将存为哈希）。<br>
+      推送到 GitHub 还需要你的 GitHub Token（ PAT，需 repo 写权限），在下方填写。
+    </div>
+    <div class="msg" id="tkMsg"></div>
+  </div>
+
+  <!-- ② GitHub Token -->
+  <div class="card hide" id="patCard">
+    <h2>GitHub 推送凭证</h2>
+    <div class="frow"><input id="pat" type="password" placeholder="GitHub Personal Access Token（repo 权限）"></div>
+    <div class="frow" style="align-items:center">
+      <label class="ck"><input type="checkbox" id="patRemember" checked> 在本机记住（仅存此浏览器）</label>
+      <button class="b" id="patBtn" style="margin-left:auto">确认</button>
+    </div>
+    <div class="hint">Token 只保存在你自己的浏览器里，不会写进仓库。创建入口：GitHub → Settings → Developer settings → Personal access tokens。</div>
+    <div class="msg" id="patMsg"></div>
+  </div>
+
+  <!-- ③ 账号管理 -->
+  <div class="hide" id="mgr">
+    <div class="card">
+      <h2>账号列表</h2>
+      <table>
+        <thead><tr><th>账号</th><th>备注</th><th>有效期至</th><th>操作</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <p class="hint" id="count" style="margin:10px 0 0"></p>
+    </div>
+    <div class="card">
+      <h2>添加账号</h2>
+      <div class="frow"><input id="nu" placeholder="账号（登录用）"></div>
+      <div class="frow"><input id="np" type="password" placeholder="密码"></div>
+      <div class="frow"><input id="nn" placeholder="备注（如：张师傅）"><input id="ne" placeholder="有效期 YYYY-MM-DD（可空=永久）"></div>
+      <button class="b" id="addBtn">添加</button>
+      <span style="margin-left:10px;font-size:12px;color:var(--sub)">密码只存哈希，添加后不可查看原文</span>
+      <div class="msg" id="addMsg"></div>
+    </div>
+    <div class="card">
+      <button class="b" id="pushBtn">推送到 GitHub</button>
+      <button class="ghost" id="reloadBtn" style="margin-left:10px">重新读取</button>
+      <button class="ghost" id="exitBtn" style="margin-left:10px">退出</button>
+      <div class="msg" id="pushMsg"></div>
+    </div>
+    <p class="hint" style="text-align:center">改动需点击「推送到 GitHub」才会生效；推送成功后约 1 分钟线上更新。</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const REPO = 'Mlinkr/Monian-Preview';
+  const BRANCH = 'master';
+  const PATH = 'assets/data/accounts.json';
+  const API = 'https://api.github.com';
+  const $ = (s) => document.querySelector(s);
+
+  const state = { data: null, adminHash: null, pat: '' };
+
+  async function sha(text) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  async function loadAccounts() {
+    const r = await fetch(PATH + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('账号表读取失败 ' + r.status);
+    return r.json();
+  }
+  async function ghGetSha() {
+    const r = await fetch(`${API}/repos/${REPO}/contents/${PATH}?ref=${BRANCH}`, {
+      headers: { Authorization: 'Bearer ' + state.pat, Accept: 'application/vnd.github+json' },
+    });
+    if (!r.ok) throw new Error('读取 GitHub 文件失败 ' + r.status + '（检查 Token 权限）');
+    const j = await r.json();
+    return j.sha;
+  }
+  async function ghCommit(text, message) {
+    const sha = await ghGetSha();
+    const r = await fetch(`${API}/repos/${REPO}/contents/${PATH}`, {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer ' + state.pat, Accept: 'application/vnd.github+json' },
+      body: JSON.stringify({
+        message, sha, branch: BRANCH,
+        content: btoa(unescape(encodeURIComponent(text))),
+      }),
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error('推送失败 ' + r.status + ' ' + t.slice(0, 160));
+    }
+  }
+  function buildJson() {
+    return JSON.stringify({ admin: state.data.admin, users: state.data.users }, null, 2) + '\n';
+  }
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  /* ---------- 渲染 ---------- */
+  function render() {
+    const tb = $('#tbody'); tb.innerHTML = '';
+    const today = todayStr();
+    (state.data.users || []).forEach((u, i) => {
+      const tr = document.createElement('tr');
+      const old = u.expire && u.expire < today;
+      tr.innerHTML = `
+        <td>${u.u}</td><td>${u.note || ''}</td>
+        <td class="${old ? 'exp-old' : ''}">${u.expire || '永久'}${old ? '（已过期）' : ''}</td>
+        <td>
+          <button class="mini" data-act="pwd" data-i="${i}">改密</button>
+          <button class="mini" data-act="exp" data-i="${i}">改期</button>
+          <button class="mini" data-act="note" data-i="${i}">改备注</button>
+          <button class="mini del" data-act="del" data-i="${i}">删除</button>
+        </td>`;
+      tb.appendChild(tr);
+    });
+    $('#count').textContent = `共 ${(state.data.users || []).length} 个账号（改动后需点「推送到 GitHub」）`;
+  }
+  function show(id, on) { $(id).classList.toggle('hide', !on); }
+
+  /* ---------- ① 令牌 ---------- */
+  async function tokenStep() {
+    const tk = $('#tk').value.trim();
+    if (!tk) { $('#tkMsg').textContent = '请输入令牌'; return; }
+    const first = !state.data.admin;
+    if (first) {
+      if ($('#tk2').value.trim() !== tk) { $('#tkMsg').textContent = '两次输入不一致'; return; }
+      state.data.admin = { p: await sha('__admin__:' + tk) };
+      show('#patCard', true);
+      $('#tkMsg').className = 'msg ok';
+      $('#tkMsg').textContent = '令牌已就绪，还需填写 GitHub Token 完成首次保存';
+      $('#pat').focus();
+      return;
+    }
+    const h = await sha('__admin__:' + tk);
+    if (h !== state.data.admin.p) { $('#tkMsg').textContent = '令牌不正确'; return; }
+    $('#tkMsg').className = 'msg ok';
+    $('#tkMsg').textContent = '令牌正确';
+    // 已记住 PAT 则直接进
+    const saved = localStorage.getItem('mnPat');
+    if (saved) { state.pat = saved; enterMgr(); }
+    else show('#patCard', true);
+  }
+
+  /* ---------- ② PAT ---------- */
+  function patStep() {
+    const p = $('#pat').value.trim();
+    if (!p) { $('#patMsg').textContent = '请填写 GitHub Token'; return; }
+    state.pat = p;
+    if ($('#patRemember').checked) localStorage.setItem('mnPat', p);
+    else localStorage.removeItem('mnPat');
+    $('#patMsg').className = 'msg ok';
+    $('#patMsg').textContent = '已确认';
+    enterMgr();
+  }
+
+  function enterMgr() {
+    show('#tokenCard', false);
+    show('#patCard', false);
+    show('#mgr', true);
+    render();
+  }
+
+  /* ---------- ③ 管理 ---------- */
+  async function push() {
+    const btn = $('#pushBtn');
+    btn.disabled = true;
+    $('#pushMsg').className = 'msg';
+    $('#pushMsg').textContent = '正在推送…';
+    try {
+      await ghCommit(buildJson(), 'chore: 更新账号表 (' + new Date().toLocaleString('zh-CN') + ')');
+      $('#pushMsg').className = 'msg ok';
+      $('#pushMsg').textContent = '推送成功，约 1 分钟后线上生效';
+    } catch (e) {
+      $('#pushMsg').textContent = e.message;
+    }
+    btn.disabled = false;
+  }
+
+  function bind() {
+    $('#tkBtn').addEventListener('click', tokenStep);
+    $('#tk').addEventListener('keydown', (e) => { if (e.key === 'Enter') tokenStep(); });
+    $('#patBtn').addEventListener('click', patStep);
+    $('#pat').addEventListener('keydown', (e) => { if (e.key === 'Enter') patStep(); });
+    $('#pushBtn').addEventListener('click', push);
+    $('#reloadBtn').addEventListener('click', async () => {
+      state.data = await loadAccounts(); render();
+      $('#pushMsg').className = 'msg ok'; $('#pushMsg').textContent = '已重新读取';
+    });
+    $('#exitBtn').addEventListener('click', () => location.reload());
+
+    $('#addBtn').addEventListener('click', async () => {
+      const u = $('#nu').value.trim(), p = $('#np').value;
+      const note = $('#nn').value.trim(), expire = $('#ne').value.trim();
+      const msg = $('#addMsg');
+      if (!u || !p) { msg.textContent = '账号和密码都要填'; return; }
+      if (expire && !/^\d{4}-\d{2}-\d{2}$/.test(expire)) { msg.textContent = '有效期格式应为 YYYY-MM-DD'; return; }
+      if ((state.data.users || []).some((x) => x.u === u)) { msg.textContent = '该账号已存在'; return; }
+      state.data.users = state.data.users || [];
+      state.data.users.push({ u, p: await sha(`${u}:${p}`), note, expire: expire || '' });
+      render();
+      msg.className = 'msg ok';
+      msg.textContent = '已加入列表，记得点「推送到 GitHub」';
+      ['nu', 'np', 'nn', 'ne'].forEach((id) => { $('#' + id).value = ''; });
+    });
+
+    $('#tbody').addEventListener('click', async (e) => {
+      const b = e.target.closest('.mini');
+      if (!b) return;
+      const i = +b.dataset.i;
+      const u = state.data.users[i];
+      const act = b.dataset.act;
+      if (act === 'del') {
+        if (confirm('删除账号 ' + u.u + '？')) { state.data.users.splice(i, 1); render(); }
+      } else if (act === 'pwd') {
+        const np = prompt('为 ' + u.u + ' 设置新密码：');
+        if (np) { u.p = await sha(`${u.u}:${np}`); render(); }
+      } else if (act === 'exp') {
+        const ne = prompt('有效期（YYYY-MM-DD，留空为永久）：', u.expire || '');
+        if (ne != null && (/^\d{4}-\d{2}-\d{2}$/.test(ne) || ne === '')) { u.expire = ne; render(); }
+      } else if (act === 'note') {
+        const nn = prompt('备注：', u.note || '');
+        if (nn != null) { u.note = nn; render(); }
+      }
+    });
+  }
+
+  (async function boot() {
+    bind();
+    try {
+      state.data = await loadAccounts();
+    } catch (e) {
+      $('#tkMsg').textContent = '账号表读取失败：' + e.message;
+      return;
+    }
+    const first = !state.data.admin;
+    $('#tokenTitle').textContent = first ? '设置管理令牌（首次使用）' : '输入管理令牌';
+    show('#firstHint', first);
+    show('#tkConfirmRow', first);
+  })();
+})();
+</script>
+</body>
+</html>
