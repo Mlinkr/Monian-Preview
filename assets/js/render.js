@@ -35,6 +35,15 @@
     ctx.drawImage(cur, csx, csy, csw, csh, dx, dy, dw, dh);
   }
 
+  // 等比铺满目标框（cover）：多余部分裁掉，用于底图与 16:9 图片水印
+  function drawCover(ctx, src, sw0, sh0, dx, dy, dw, dh) {
+    if (!sw0 || !sh0) return;
+    const k = Math.max(dw / sw0, dh / sh0);
+    const cw = Math.min(sw0, dw / k);
+    const ch = Math.min(sh0, dh / k);
+    drawSmooth(ctx, src, (sw0 - cw) / 2, (sh0 - ch) / 2, cw, ch, dx, dy, dw, dh);
+  }
+
   // 完整显示、绝不裁剪：等比缩放到能装进目标框，居中，多余部分留透明
   function drawContain(ctx, src, sw0, sh0, dx, dy, dw, dh) {
     const k = Math.min(dw / sw0, dh / sh0);
@@ -290,11 +299,7 @@
   function drawWatermarkGroup(ctx, items, rect, baseSize, vars, padMul) {
     if (!items || !items.length) return;
 
-    // 先画图片水印（在文字下层）
-    for (const it of items) {
-      if (isImageItem(it)) drawImageWatermark(ctx, it, rect);
-    }
-
+    // 只画文字；图片水印由 paint() 在更低图层统一处理
     const groups = {};
     for (const it of items) {
       if (isImageItem(it)) continue;
@@ -479,42 +484,54 @@
     return out;
   }
 
-  /* ---------------- 主绘制 ---------------- */
+  /* ---------------- 主绘制 ----------------
+     图层顺序（从下往上）：
+       0 模板底图（有则画）
+       1 素材拼接图（含各自单元格的衬底）
+       2 水印图片（每张图上的 / 整张图上的）
+       3 文字水印（每张图上的 / 整张图上的）
+     文字永远在最上层，图片水印与文字可同时存在、各自独立调透明度。
+     ---------------------------------------------------- */
   function paint(ctx, lay, st, opts) {
     const { W, H } = lay;
     ctx.save();
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // 背景：先铺底色，再叠自定义底图
+    const n = st.files.length;
+    const perList = st.wmPer || [];
+    const globList = st.wmGlobal || [];
+
+    const perVars = (i) => ({
+      folder: st.folderName || '',
+      date: st.dateText || '',
+      count: st.countText != null ? st.countText : String(n),
+      index: `${U.pad2(i + 1)}/${U.pad2(n)}`,
+    });
+    const globVars = { folder: st.folderName || '', date: st.dateText || '', count: st.countText != null ? st.countText : String(n), index: '' };
+
+    /* ===== 0 底图 ===== */
     ctx.fillStyle = (st.canvas && st.canvas.color) || '#0f0f14';
     ctx.fillRect(0, 0, W, H);
-    if (lay.mode === 'image') {
+    if (lay.mode === 'image' && st.template && st.template.img) {
       const t = st.template;
-      if (t && t.img) {
-        drawSmooth(ctx, t.img, 0, 0, t.img.naturalWidth || t.img.width, t.img.naturalHeight || t.img.height, 0, 0, W, H);
-      }
+      drawSmooth(ctx, t.img, 0, 0, t.img.naturalWidth || t.img.width, t.img.naturalHeight || t.img.height, 0, 0, W, H);
     }
 
-    // 每张图
-    const n = st.files.length;
-    const hasTextWm = autoItems(st, { folder: st.folderName, date: st.dateText, count: n }).length > 0 ||
-      (st.wmPer || []).some((w) => !isImageItem(w) && w.text && w.text.trim());
+    /* ===== 1 素材拼接 ===== */
+    const hasTextWm = autoItems(st, perVars(0)).length > 0 ||
+      perList.some((w) => !isImageItem(w) && w.text && w.text.trim());
     for (const cell of lay.cells) {
       const f = st.files[cell.i];
       ctx.save();
       U.roundRect(ctx, cell.x, cell.y, cell.w, cell.h, lay.radius);
       ctx.clip();
 
-      // 占位底色
       ctx.fillStyle = '#15151a';
       ctx.fillRect(cell.x, cell.y, cell.w, cell.h);
 
       if (f && f.img) {
-        // 关键：contain 而非 cover，完整显示不裁剪
         drawContain(ctx, f.img, f.w, f.h, cell.x, cell.y, cell.w, cell.h);
-
-        // 底部衬底渐变，让浅色画面上文字也清晰
         if (hasTextWm) {
           const g = ctx.createLinearGradient(0, cell.y + cell.h * 0.52, 0, cell.y + cell.h);
           g.addColorStop(0, 'rgba(0,0,0,0)');
@@ -530,42 +547,44 @@
         ctx.textBaseline = 'middle';
         ctx.fillText('载入中…', cell.x + cell.w / 2, cell.y + cell.h / 2);
       }
-
-      // 每张图水印（含图片水印）
-      const vars = {
-        folder: st.folderName || '',
-        date: st.dateText || '',
-        price: st.priceText || '',
-        index: `${U.pad2(cell.i + 1)}/${U.pad2(n)}`,
-        count: n,
-      };
-      drawWatermarkGroup(ctx, autoItems(st, vars).concat(st.wmPer || []), cell, cell.w * 0.042, vars, 1.5);
       ctx.restore();
+    }
 
-      // 细边框
+    /* ===== 2 水印图片（在素材之上、文字之下） ===== */
+    const imgPer = perList.filter(isImageItem);
+    const imgGlob = globList.filter(isImageItem);
+    if (imgPer.length || imgGlob.length) {
+      for (const cell of lay.cells) {
+        ctx.save();
+        U.roundRect(ctx, cell.x, cell.y, cell.w, cell.h, lay.radius);
+        ctx.clip();
+        for (const it of imgPer) drawImageWatermark(ctx, it, cell);
+        if (imgGlob.length) {
+          // 整图图片水印只画一次，这里跳过
+        }
+        ctx.restore();
+      }
+      if (imgGlob.length) {
+        for (const it of imgGlob) drawImageWatermark(ctx, it, { x: 0, y: 0, w: W, h: H });
+      }
+    }
+
+    /* ===== 3 文字水印（最上层） ===== */
+    for (const cell of lay.cells) {
       ctx.save();
-      U.roundRect(ctx, cell.x + 0.5, cell.y + 0.5, cell.w - 1, cell.h - 1, lay.radius);
-      ctx.strokeStyle = 'rgba(255,255,255,.07)';
-      ctx.lineWidth = Math.max(1, W * 0.0006);
-      ctx.stroke();
+      U.roundRect(ctx, cell.x, cell.y, cell.w, cell.h, lay.radius);
+      ctx.clip();
+      const vars = perVars(cell.i);
+      const textPer = autoItems(st, vars).concat(perList.filter((it) => !isImageItem(it)));
+      if (textPer.length) drawWatermarkGroup(ctx, textPer, cell, cell.w * 0.042, vars, 1.5);
       ctx.restore();
     }
 
-    // 纯色底图的标题栏
-    if (lay.mode === 'solid' && lay.hasHead) {
-      paintHeader(ctx, lay, st);
-    }
+    if (lay.mode === 'solid' && lay.hasHead) paintHeader(ctx, lay, st);
 
-    // 整图水印
-    if (st.wmGlobal && st.wmGlobal.length) {
-      const vars = {
-        folder: st.folderName || '',
-        date: st.dateText || '',
-        price: st.priceText || '',
-        index: '',
-        count: st.files.length,
-      };
-      drawWatermarkGroup(ctx, st.wmGlobal, { x: 0, y: 0, w: W, h: H }, W * 0.0125, vars, 2.2);
+    const textGlob = globList.filter((it) => !isImageItem(it));
+    if (textGlob.length) {
+      drawWatermarkGroup(ctx, textGlob, { x: 0, y: 0, w: W, h: H }, W * 0.0125, globVars, 2.2);
     }
 
     // 参考线（不导出）

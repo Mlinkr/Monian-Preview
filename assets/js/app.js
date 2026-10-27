@@ -43,9 +43,6 @@
     progressBar: $('#progressBar'),
     progressTxt: $('#progressTxt'),
     assetInfo: $('#assetInfo'),
-    folderName: $('#folderName'),
-    dateText: $('#dateText'),
-    countText: $('#countText'),
     thumbs: $('#thumbs'),
     wmTabs: $('#wmTabs'),
     wmList: $('#wmList'),
@@ -205,8 +202,6 @@
     const clearBtn = document.getElementById('btnClearFiles');
     if (clearBtn) clearBtn.hidden = state.files.length === 0;
     if (state.files.length) {
-      el.folderName.value = state.folderName || '';
-      el.dateText.value = state.dateText || '';
     }
   }
 
@@ -322,7 +317,6 @@
       return;
     }
     state.countText = String(state.files.length);
-    if (el.countText) el.countText.value = state.countText;
     renderThumbs();
     commit(true);
     MN.toast(`已载入 ${state.files.length} 张图片`);
@@ -363,21 +357,7 @@
     if (dt && dt.files && dt.files.length) handleFiles(dt.files, 'files');
   });
 
-  // 素材信息
-  el.folderName.addEventListener('input', () => {
-    state.folderName = el.folderName.value;
-    commit();
-  });
-  el.dateText.addEventListener('input', () => {
-    state.dateText = el.dateText.value;
-    commit();
-  });
-  if (el.countText) {
-    el.countText.addEventListener('input', () => {
-      state.countText = el.countText.value;
-      commit();
-    });
-  }
+  // 素材信息的内容输入已并入 01 的自动水印行，这里不再单独绑定
 
   /* ---------------- 水印列表 ---------------- */
   const ANCHORS = [
@@ -706,14 +686,27 @@
     });
   }
 
-  /* ---------------- 01 自动水印（名称 / 日期 / 张数） ---------------- */
+  /* ---------------- 01 素材信息 + 自动水印（名称 / 日期 / 张数） ---------------- */
   const AUTO_KEYS = [
-    ['folder', '名称水印', '跟「素材名称」联动，支持占位符'],
-    ['date', '时间水印', '跟「日期」联动，支持占位符'],
-    ['count', '张数水印', '跟「张数」联动，支持占位符'],
+    ['folder', '名称', '{folder}', 'folderName', '文件夹名称'],
+    ['date', '日期', '{date}', 'dateText', '如 20261027'],
+    ['count', '张数', '{count}', 'countText', '导入后自动填'],
   ];
 
   const AUTO_DEFAULT_TEXT = { folder: '{folder}', date: '{date}', count: '{count}' };
+  const AUTO_PH = { folder: '{folder}', date: '{date}', count: '{count}' };
+
+  // 每条水印的「内容」就是上面那个输入框的值（名称/日期/张数）
+  function contentOf(key) {
+    if (key === 'folder') return state.folderName || '';
+    if (key === 'date') return state.dateText || '';
+    return state.countText || '';
+  }
+  function setContent(key, v) {
+    if (key === 'folder') state.folderName = v;
+    else if (key === 'date') state.dateText = v;
+    else state.countText = v;
+  }
 
   function autoWmRef(key) {
     if (!state.autoWm[key]) state.autoWm[key] = { on: false, text: AUTO_DEFAULT_TEXT[key], anchor: 'bl', size: 1, opacity: 0.9, weight: 400, color: '#ffffff', dx: 0, dy: 0 };
@@ -724,25 +717,26 @@
   function renderAutoWm() {
     const box = document.getElementById('autoWmBox');
     if (!box) return;
-    const AUTO_PH = { folder: '{folder}，跟「素材名称」联动', date: '{date}，跟「日期」联动', count: '{count}，跟「张数」联动' };
-    box.innerHTML = AUTO_KEYS.map(([key, label]) => {
+    box.innerHTML = AUTO_KEYS.map(([key, label, phText, inputId, inputPh]) => {
       const a = autoWmRef(key);
-      const ph = AUTO_PH[key];
       return `
-      <div class="auto-row" data-key="${key}">
+      <div class="auto-row${a.on ? '' : ' off'}" data-key="${key}">
         <div class="auto-row-top">
-          <button type="button" class="aw-on${a.on ? ' on' : ''}">${label}</button>
-          <input type="color" class="aw-color" value="${U.esc(a.color || '#ffffff')}" title="颜色">
-          <select class="aw-anchor">
-            ${ANCHORS.map(([v, t]) => `<option value="${v}"${a.anchor === v ? ' selected' : ''}>${t}</option>`).join('')}
-          </select>
-        </div>
-        <div class="auto-row-mid"${a.on ? '' : ' hidden'}>
-          <input type="text" class="aw-text" value="${U.esc(a.text || '')}" placeholder="${ph}">
+          <button type="button" class="aw-on${a.on ? ' on' : ''}" title="点一下开关此水印">${label}</button>
+          <input type="text" class="aw-content" data-key="${key}" value="${U.esc(contentOf(key))}" placeholder="${inputPh}">
+          <button type="button" class="aw-clear" title="清空内容">×</button>
         </div>
         <div class="auto-row-bot"${a.on ? '' : ' hidden'}>
+          <input type="color" class="aw-color" value="${U.esc(a.color || '#ffffff')}" title="水印颜色">
+          <select class="aw-anchor" title="位置">
+            ${ANCHORS.map(([v, t]) => `<option value="${v}"${a.anchor === v ? ' selected' : ''}>${t}</option>`).join('')}
+          </select>
           <div class="wm-slide"><span>字号</span><input type="range" class="aw-size" min="0.4" max="2.6" step="0.05" value="${a.size || 1}"><output>${(a.size || 1).toFixed(2)}</output></div>
-          <div class="wm-slide"><span>透明</span><input type="range" class="aw-op" min="0.05" max="1" step="0.05" value="${a.opacity == null ? 0.9 : a.opacity}"><output class="aw-op-out">${Math.round((a.opacity == null ? 0.9 : a.opacity) * 100)}%</output></div>
+          <div class="wm-slide"><span>透明</span><input type="range" class="aw-op" min="0.02" max="1" step="0.02" value="${a.opacity == null ? 0.9 : a.opacity}"><output class="aw-op-out">${Math.round((a.opacity == null ? 0.9 : a.opacity) * 100)}%</output></div>
+        </div>
+        <div class="auto-row-tpl"${a.on ? '' : ' hidden'}>
+          <span class="aw-tpl-label">水印文字</span>
+          <input type="text" class="aw-text" value="${U.esc(a.text == null ? AUTO_DEFAULT_TEXT[key] : a.text)}" placeholder="${AUTO_PH[key]}">
         </div>
       </div>`;
     }).join('');
@@ -751,12 +745,20 @@
   const autoBox = document.getElementById('autoWmBox');
   if (autoBox) {
     autoBox.addEventListener('click', (e) => {
-      if (!e.target.classList.contains('aw-on')) return;
       const row = e.target.closest('.auto-row');
-      const a = autoWmRef(row.dataset.key);
-      a.on = !a.on;
-      renderAutoWm();
-      commit(true);
+      if (!row) return;
+      const key = row.dataset.key;
+      if (e.target.classList.contains('aw-on')) {
+        const a = autoWmRef(key);
+        a.on = !a.on;
+        renderAutoWm();
+        commit(true);
+      } else if (e.target.classList.contains('aw-clear')) {
+        setContent(key, '');
+        const inp = row.querySelector('.aw-content');
+        if (inp) inp.value = '';
+        commit();
+      }
     });
     autoBox.addEventListener('change', (e) => {
       if (!e.target.classList.contains('aw-anchor')) return;
@@ -767,19 +769,23 @@
     autoBox.addEventListener('input', (e) => {
       const row = e.target.closest('.auto-row');
       if (!row) return;
-      const a = autoWmRef(row.dataset.key);
-      if (e.target.classList.contains('aw-size')) {
-        a.size = +e.target.value;
-        const o = row.querySelector('.aw-size');
-        if (o && o.parentElement.querySelector('output')) o.parentElement.querySelector('output').textContent = (+e.target.value).toFixed(2);
-      } else if (e.target.classList.contains('aw-op')) {
-        a.opacity = +e.target.value;
+      const key = row.dataset.key;
+      const a = autoWmRef(key);
+      const t = e.target;
+      if (t.classList.contains('aw-content')) {
+        setContent(key, t.value);
+      } else if (t.classList.contains('aw-text')) {
+        a.text = t.value;
+      } else if (t.classList.contains('aw-size')) {
+        a.size = +t.value;
+        const o = t.parentElement.querySelector('output');
+        if (o) o.textContent = (+t.value).toFixed(2);
+      } else if (t.classList.contains('aw-op')) {
+        a.opacity = +t.value;
         const o = row.querySelector('.aw-op-out');
-        if (o) o.textContent = Math.round(+e.target.value * 100) + '%';
-      } else if (e.target.classList.contains('aw-color')) {
-        a.color = e.target.value;
-      } else if (e.target.classList.contains('aw-text')) {
-        a.text = e.target.value;
+        if (o) o.textContent = Math.round(+t.value * 100) + '%';
+      } else if (t.classList.contains('aw-color')) {
+        a.color = t.value;
       } else return;
       commit();
     });
@@ -1034,9 +1040,6 @@
 
   /* ---------------- 初始化控件 ---------------- */
   function syncUI() {
-    el.folderName.value = state.folderName || '';
-    el.dateText.value = state.dateText || '';
-    if (el.countText) el.countText.value = state.countText || '';
     el.headerTitle.value = state.header.title || '';
     el.headerMeta.value = state.header.meta || '';
     setSlider('#cols', state.layout.cols);

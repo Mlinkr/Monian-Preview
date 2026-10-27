@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="拼图预览">
 <link rel="stylesheet" href="assets/fonts/font.css?v=2">
-<link rel="stylesheet" href="assets/css/style.css?v=10">
+<link rel="stylesheet" href="assets/css/style.css?v=11">
 </head>
 <body>
 
@@ -56,20 +56,8 @@
 
         <div class="progress" id="progress" hidden><div class="progress-bar" id="progressBar"></div><span id="progressTxt">处理中…</span></div>
 
-        <div class="rows" id="assetInfo" hidden>
-          <div class="row">
-            <label for="folderName">素材名称</label>
-            <input type="text" id="folderName" placeholder="文件夹名称">
-          </div>
-          <div class="row">
-            <label for="dateText">日期</label>
-            <input type="text" id="dateText" placeholder="如 20261027">
-          </div>
-          <div class="row">
-            <label for="countText">张数</label>
-            <input type="text" id="countText" placeholder="如 4（导入后自动填）">
-          </div>
-          <p class="auto-tip">以下水印默认用占位符，跟随上方内容联动；文字可以随意改，同样支持 <code>{folder}</code> <code>{date}</code> <code>{count}</code> <code>{index}</code></p>
+        <div class="asset-box" id="assetInfo" hidden>
+          <div class="auto-tip">名称 / 日期 / 张数会跟随内容联动，每条可单独开关并调整样式；文字默认是占位符，可自由修改</div>
           <div id="autoWmBox"></div>
         </div>
 
@@ -289,8 +277,8 @@
   </div>
 </div>
 
-<script src="assets/js/core.js?v=9"></script>
-<script src="assets/js/render.js?v=9"></script>
-<script src="assets/js/app.js?v=9"></script>
+<script src="assets/js/core.js?v=10"></script>
+<script src="assets/js/render.js?v=10"></script>
+<script src="assets/js/app.js?v=10"></script>
 </body>
 </html>
