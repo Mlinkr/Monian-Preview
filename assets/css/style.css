@@ -666,3 +666,9 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:5px}
 .aw-mode-btn{flex:1;border:1px solid var(--line);background:transparent;color:var(--dim-2);
   border-radius:6px;padding:4px 0;font-size:10.5px;cursor:pointer;transition:.18s}
 .aw-mode-btn.on{color:#d8b175;border-color:rgba(216,177,117,.5);background:rgba(216,177,117,.1)}
+
+/* 版式提示：跟随素材比例时高亮 */
+.fixed-note b#ratioTip.on{color:#7ec8a0}
+/* 底图颜色说明：非纯色模式下高亮提醒 */
+.tip.color-hint{margin-top:8px;color:#d8b175}
+#solidPanel:not([hidden]) ~ .color-hint{display:none}

@@ -45,6 +45,38 @@
   }
 
   // 完整显示、绝不裁剪：等比缩放到能装进目标框，居中，多余部分留透明
+  // 单元格比例：
+  // - 默认 16:9（绝大多数素材都是这个比例，画面整齐）
+  // - 只有当「超过 60% 的素材都明显不是 16:9」时，才整体改用素材众数比例，
+  //   这样非 16:9 的素材按自身比例拼接，不会有留白分层
+  const ASPECT_TOL = 0.03;
+  function pickAspect(st) {
+    const files = (st && st.files) || [];
+    const list = [];
+    for (const f of files) {
+      if (!f || !f.w || !f.h) continue;
+      list.push(f.w / f.h);
+    }
+    if (!list.length) return CELL_ASPECT;
+    const near16 = list.filter((r) => Math.abs(r - CELL_ASPECT) <= ASPECT_TOL).length;
+    // 多数素材就是 16:9 → 一律按 16:9，保持整齐
+    if (near16 / list.length > 0.4) return CELL_ASPECT;
+
+    // 多数素材不是 16:9：取众数桶（0.02 一档）的平均比例
+    const buckets = new Map();
+    for (const r of list) {
+      const k = Math.round(r * 50);
+      if (!buckets.has(k)) buckets.set(k, []);
+      buckets.get(k).push(r);
+    }
+    let best = null;
+    for (const [, arr] of buckets) {
+      if (!best || arr.length > best.length) best = arr;
+    }
+    const modeAsp = best.reduce((s, v) => s + v, 0) / best.length;
+    return Math.abs(modeAsp - CELL_ASPECT) <= ASPECT_TOL ? CELL_ASPECT : modeAsp;
+  }
+
   function drawContain(ctx, src, sw0, sh0, dx, dy, dw, dh) {
     const k = Math.min(dw / sw0, dh / sh0);
     const w = sw0 * k;
@@ -117,14 +149,15 @@
       };
       const cols = Math.max(1, Math.min(L.cols, n || 1));
       const rows = Math.max(1, Math.ceil(n / cols));
+      const cellAsp2 = pickAspect(st);
 
-      // 格子恒为 16:9：先按可用宽度算，若超出可用高度再按高度回缩
+      // 格子按素材比例：先按可用宽度算，若超出可用高度再按高度回缩
       let cw = Math.max(1, (area.w - gap * (cols - 1)) / cols);
-      let ch = cw / CELL_ASPECT;
+      let ch = cw / cellAsp2;
       const maxH = Math.max(1, (area.h - gap * (rows - 1)) / rows);
       if (ch > maxH) {
         ch = maxH;
-        cw = ch * CELL_ASPECT;
+        cw = ch * cellAsp2;
       }
       const gridH = rows * ch + (rows - 1) * gap;
       const gridTop = area.y + Math.max(0, (area.h - gridH) / 2);
@@ -150,8 +183,9 @@
     const cols = Math.max(1, Math.min(L.cols, n || 1));
     const rows = Math.max(1, Math.ceil(n / cols));
     const cellW = Math.max(1, (W - margin * 2 - gap * (cols - 1)) / cols);
-    // 恒 16:9，绝不拉伸
-    let cellH = cellW / CELL_ASPECT;
+    // 默认 16:9；素材明显不是 16:9 时按素材自身比例（众数），绝不拉伸
+    const cellAsp = pickAspect(st);
+    let cellH = cellW / cellAsp;
 
     const title = ((st.header && st.header.title) || '').trim();
     const meta = ((st.header && st.header.meta) || '').trim();
@@ -223,7 +257,8 @@
     if (!iw || !ih) return;
 
     ctx.save();
-    ctx.globalAlpha = op;
+    // 与文字水印一致：做 gamma 换算，避免低档位区间看起来几乎没变化
+    ctx.globalAlpha = Math.pow(op, 1 / 2.2);
 
     // 16:9 图片水印：等比缩放铺满整个区域（cover），与素材完全对齐
     if (it.fitCell) {
@@ -386,14 +421,16 @@
         ctx.textAlign = align;
         ctx.textBaseline = 'alphabetic';
         const op = U.clamp(ln.op, 0, 1);
-        // 阴影只为「提高可读性」，必须严格跟随透明度衰减。
-        // 之前 0.62*op 且 blur 固定，op=0.02 时阴影仍有 1.2% 覆盖率 + 大模糊，
-        // 等于给每个字套了一层不透明的底，导致调透明度看不出变化。
-        const shOp = 0.5 * op * op;
+        // 感知均匀：canvas 混合在 sRGB 空间做线性插值，而人眼是近似 gamma 2.2 的，
+        // 直接 globalAlpha=op 时低档位（0.3、0.2、0.1…）看起来几乎一样，
+        // 要拖到一半以下才"突然"变淡。这里做 gamma 换算，让 0/25/50/75/100 看起来等距。
+        const ga = Math.pow(op, 1 / 2.2);
+        // 阴影只为「提高可读性」，必须严格跟随透明度衰减，否则等于给字加了一层不透的底
+        const shOp = 0.5 * ga * ga;
         ctx.shadowColor = `rgba(0,0,0,${shOp.toFixed(4)})`;
-        ctx.shadowBlur = Math.max(0.5, ln.fs * 0.3 * op);
+        ctx.shadowBlur = Math.max(0.5, ln.fs * 0.3 * ga);
         ctx.shadowOffsetY = Math.max(0.3, ln.fs * 0.03);
-        ctx.globalAlpha = op;
+        ctx.globalAlpha = ga;
         ctx.fillStyle = ln.color || '#ffffff';
         ctx.fillText(ln.text, x, baseline);
         ctx.globalAlpha = 1;
@@ -536,11 +573,19 @@
       U.roundRect(ctx, cell.x, cell.y, cell.w, cell.h, lay.radius);
       ctx.clip();
 
+      // 先铺满一层不透明底色：图片外的窄边也不会透出底层画布，避免"分层留白"
       ctx.fillStyle = '#15151a';
       ctx.fillRect(cell.x, cell.y, cell.w, cell.h);
 
       if (f && f.img) {
-        drawContain(ctx, f.img, f.w, f.h, cell.x, cell.y, cell.w, cell.h);
+        // 格子比例跟素材一致时直接铺满（零留白）；不一致才等比缩放留边
+        const cellAsp = cell.w / cell.h;
+        const imgAsp = f.w / f.h;
+        if (Math.abs(imgAsp - cellAsp) / cellAsp <= 0.012) {
+          drawSmooth(ctx, f.img, 0, 0, f.w, f.h, cell.x, cell.y, cell.w, cell.h);
+        } else {
+          drawContain(ctx, f.img, f.w, f.h, cell.x, cell.y, cell.w, cell.h);
+        }
         // 文字水印位于下半部分时，给这一段垫一层浅浅的渐变，保证任何底图上都读得清
         const items = textItemsAll(cell.i);
         const bottomOnly = items.length > 0 && items.every((it) => !it.free && (it.anchor || 'bl')[0] === 'b');
@@ -615,6 +660,7 @@
   /* ---------------- 对外 ---------------- */
   MN.Render = {
     CELL_ASPECT,
+    pickAspect,
     layout: computeLayout,
     paint,
     renderTo(ctx, W, st, opts) {

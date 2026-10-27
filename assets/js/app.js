@@ -322,6 +322,7 @@
     }
     state.countText = String(state.files.length);
     renderThumbs();
+    syncRatioTip();
     commit(true);
     MN.toast(`已载入 ${state.files.length} 张图片`);
   }
@@ -1143,7 +1144,23 @@
     syncBaseUI();
     renderAutoWm();
     renderThumbs();
+    syncRatioTip();
     updateOutInfo();
+  }
+
+  // 版式提示：告诉用户当前格子用的是 16:9 还是素材自身比例
+  function syncRatioTip() {
+    const tip = document.getElementById('ratioTip');
+    if (!tip) return;
+    const asp = MN.Render.pickAspect(state);
+    const is169 = Math.abs(asp - 16 / 9) < 0.005;
+    if (is169) {
+      tip.textContent = '单元格比例 16 : 9（素材多数为此比例）';
+      tip.classList.remove('on');
+    } else {
+      tip.textContent = `单元格跟随素材比例 ${asp.toFixed(2)} : 1`;
+      tip.classList.add('on');
+    }
   }
 
   /* ---------------- 导出 ---------------- */
