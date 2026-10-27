@@ -422,8 +422,9 @@
         const op = U.clamp(ln.op, 0, 1);
         // 透明度就是透明度：直接用原值，保证拖动多少就变多少（线性一一对应）
         // 阴影只为「提高可读性」，必须严格跟随透明度衰减，否则等于给字加了一层不透的底
+        // 深色字（浅底图）用浅色光晕，浅色字（深底图）用深色投影，两边都不会糊
         const shOp = 0.45 * op;
-        ctx.shadowColor = `rgba(0,0,0,${shOp.toFixed(4)})`;
+        ctx.shadowColor = isLightColor(ln.color) ? `rgba(0,0,0,${shOp.toFixed(4)})` : `rgba(255,255,255,${(shOp * 0.9).toFixed(4)})`;
         ctx.shadowBlur = Math.max(0.5, ln.fs * 0.3 * op);
         ctx.shadowOffsetY = Math.max(0.3, ln.fs * 0.03);
         ctx.globalAlpha = op;
@@ -553,7 +554,7 @@
     const globVars = { folder: st.folderName || '', date: st.dateText || '', count: st.countText != null ? st.countText : String(n), index: '' };
 
     /* ===== 0 底图 ===== */
-    ctx.fillStyle = (st.canvas && st.canvas.color) || '#0f0f14';
+    ctx.fillStyle = (st.canvas && st.canvas.color) || '#f2efe8';
     ctx.fillRect(0, 0, W, H);
     if (lay.mode === 'image' && st.template && st.template.img) {
       const t = st.template;
@@ -570,7 +571,7 @@
       ctx.clip();
 
       // 先铺满一层不透明底色：图片外的窄边也不会透出底层画布，避免"分层留白"
-      ctx.fillStyle = '#15151a';
+      ctx.fillStyle = '#e8e4dc';
       ctx.fillRect(cell.x, cell.y, cell.w, cell.h);
 
       if (f && f.img) {

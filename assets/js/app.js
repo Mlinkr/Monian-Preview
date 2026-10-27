@@ -433,7 +433,7 @@
                <label class="wm-inline">旋转<input type="range" class="wm-rot" min="-45" max="45" step="1" value="${it.rotate || 0}"><output class="wm-rot-out">${it.rotate || 0}°</output></label>
              </div>`)
           : `<div class="wm-item-bot">
-               <input type="color" class="wm-color" value="${U.esc(it.color || '#ffffff')}" title="文字颜色">
+               <input type="color" class="wm-color" value="${U.esc(it.color || inkOn(state))}" title="文字颜色">
                <select class="wm-anchor"${free ? ' disabled' : ''}>
                  ${ANCHORS.map(([v, t]) => `<option value="${v}"${it.anchor === v ? ' selected' : ''}>${t}</option>`).join('')}
                </select>
@@ -610,7 +610,7 @@
       size: 1,
       opacity: 0.85,
       weight: 400,
-      color: '#ffffff',
+      color: inkOn(state),
     });
     renderWmList();
     commit(true);
@@ -713,8 +713,19 @@
     else state.countText = v;
   }
 
+  // 底图是浅色时水印用深墨色，深色底图时用白色，避免默认看不见
+  function inkOn(st) {
+    const c = String((st && st.canvas && st.canvas.color) || '#f2efe8');
+    const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c.trim());
+    if (!m) return '#1d1a15';
+    let hex = m[1];
+    if (hex.length === 3) hex = hex.split('').map((x) => x + x).join('');
+    const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.6 ? '#1d1a15' : '#ffffff';
+  }
+
   function autoWmRef(key) {
-    if (!state.autoWm[key]) state.autoWm[key] = { on: false, text: AUTO_DEFAULT_TEXT[key], anchor: 'bl', size: 1, opacity: 0.9, weight: 400, color: '#ffffff', dx: 0, dy: 0 };
+    if (!state.autoWm[key]) state.autoWm[key] = { on: false, text: AUTO_DEFAULT_TEXT[key], anchor: 'bl', size: 1, opacity: 0.9, weight: 400, color: inkOn(state), dx: 0, dy: 0 };
     if (state.autoWm[key].text == null) state.autoWm[key].text = AUTO_DEFAULT_TEXT[key];
     return state.autoWm[key];
   }
@@ -753,7 +764,7 @@
           <div class="wm-slide"><span>字号</span><input type="range" class="aw-size" min="0.4" max="2.6" step="0.05" value="${a.size || 1}"><output class="aw-size-out">${(a.size || 1).toFixed(2)}</output></div>
         </div>
         <div class="auto-row-bot"${on ? '' : ' hidden'}>
-          <div class="wm-slide"><span>透明</span><input type="range" class="aw-op" min="0.02" max="1" step="0.01" value="${op}"><output class="aw-op-out">${Math.round(op * 100)}%</output></div>
+          <div class="wm-slide"><span>透明</span><input type="range" class="aw-op" min="0.02" max="1" step="0.01" value="${op}"><output class="aw-op-out">${Math.round(op * 100)}%</output><i class="aw-op-meter" data-lv="1.00,0.80,0.60,0.40,0.20,0.05" style="opacity:${op}" title="拖动时这里会同步变淡，等于水印在深底图上的实际效果"></i></div>
         </div>
         <div class="aw-pospanel"${on && open ? '' : ' hidden'}>
           <div class="wm-pos-mode">
@@ -861,6 +872,8 @@
         a.opacity = +t.value;
         const o = row.querySelector('.aw-op-out');
         if (o) o.textContent = Math.round(+t.value * 100) + '%';
+        const meter = row.querySelector('.aw-op-meter');
+        if (meter) meter.style.opacity = (+t.value).toFixed(2);
       } else if (t.classList.contains('aw-color')) {
         a.color = t.value;
       } else if (t.classList.contains('aw-dx') || t.classList.contains('aw-dy')) {
@@ -880,7 +893,7 @@
 
   /* ---------------- 底图 ---------------- */
   function canvasCfg() {
-    if (!state.canvas) state.canvas = { mode: 'solid', color: '#0f0f14', header: true };
+    if (!state.canvas) state.canvas = { mode: 'solid', color: '#f2efe8', header: true };
     return state.canvas;
   }
 
@@ -892,7 +905,7 @@
     el.tplPanel.hidden = mode !== 'image';
     el.noneTip.hidden = mode !== 'none';
 
-    el.baseColor.value = c.color || '#0f0f14';
+    el.baseColor.value = c.color || '#f2efe8';
     el.showHead.checked = c.header !== false;
     el.headFields.hidden = !el.showHead.checked;
     $$('button', el.swatches).forEach((b) => {
@@ -910,7 +923,7 @@
         const c2 = document.createElement('canvas');
         c2.width = 108; c2.height = 108;
         const cx = c2.getContext('2d');
-        cx.fillStyle = '#0b0b0f';
+        cx.fillStyle = '#f2f0eb';
         cx.fillRect(0, 0, 108, 108);
         const s = Math.min(108 / state.template.w, 108 / state.template.h);
         const dw = state.template.w * s, dh = state.template.h * s;

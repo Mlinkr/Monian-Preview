@@ -63,9 +63,9 @@
     priceText: '',
     // 01 卡片的「自动水印」：名称 / 日期 / 张数，样式在 01 内直接调整
     autoWm: {
-      folder: { on: true, text: '{folder}', anchor: 'bl', size: 1.15, opacity: 0.95, weight: 600, color: '#ffffff', dx: 0, dy: 0, free: false, px: 7, py: 78 },
-      date: { on: true, text: '{date}', anchor: 'bl', size: 0.8, opacity: 0.7, weight: 400, color: '#ffffff', dx: 0, dy: -16, free: false, px: 7, py: 68 },
-      count: { on: false, text: '{count}', anchor: 'br', size: 0.8, opacity: 0.7, weight: 400, color: '#ffffff', dx: 0, dy: -16, free: false, px: 80, py: 78 },
+      folder: { on: true, text: '{folder}', anchor: 'bl', size: 1.15, opacity: 0.95, weight: 600, color: '#ffffff', dx: 0, dy: 0, free: false, px: 7, py: 78, tone: 'auto' },
+      date: { on: true, text: '{date}', anchor: 'bl', size: 0.8, opacity: 0.7, weight: 400, color: '#ffffff', dx: 0, dy: -16, free: false, px: 7, py: 68, tone: 'auto' },
+      count: { on: false, text: '{count}', anchor: 'br', size: 0.8, opacity: 0.7, weight: 400, color: '#ffffff', dx: 0, dy: -16, free: false, px: 80, py: 78, tone: 'auto' },
     },
     countText: '',
     // 02 卡片：用户手动加的水印（文字 / 图片），不再自动塞占位符
@@ -77,7 +77,7 @@
     },
     canvas: {
       mode: 'solid',      // solid: 纯色底图 / image: 自定义底图 / none: 无底图
-      color: '#0f0f14',
+      color: '#f2efe8',
       header: true,       // 纯色模式下是否绘制标题栏
     },
     template: null, // { aspect, pad:{t,r,b,l}, img, w, h }
@@ -120,6 +120,16 @@
         const out = mergeDefault(DEFAULT_STATE, parsed);
         // 老版本没有 canvas 字段：原来用了模板图的继续用自定义底图
         if (!parsed.canvas) out.canvas.mode = parsed.template ? 'image' : 'solid';
+        // 主题转亮：以前留下的深色默认底色换成浅色默认（用户自己选过的颜色不动）
+        if (out.canvas && /^#(0f0f14|08080b|0a0a0d)$/i.test(out.canvas.color || '')) out.canvas.color = DEFAULT_STATE.canvas.color;
+        // 主题转亮：底图是浅色却还留着纯白水印（早期默认）的，换成深墨色，否则看不见
+        const lightBase = !out.canvas || !out.canvas.color || /^#(f2efe8|ffffff|fff|f5f5f5|fafafa)$/i.test(out.canvas.color);
+        if (lightBase && out.autoWm) {
+          for (const k in out.autoWm) {
+            const a = out.autoWm[k];
+            if (a && /^#fff(fff)?$/i.test(a.color || '')) a.color = '#1d1a15';
+          }
+        }
         return out;
       } catch (e) {
         return deepClone(DEFAULT_STATE);
