@@ -566,51 +566,18 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:5px}
 .guide li{margin-bottom:9px}
 .guide b{color:var(--accent);font-weight:600}
 
-/* ---------- 底部说明 ---------- */
+/* ---------- 页尾 ---------- */
 .foot{
-  padding:26px 20px calc(34px + var(--safe-b));
+  padding:18px 20px calc(22px + var(--safe-b));
   border-top:1px solid var(--line);
-  background:linear-gradient(180deg,#f2f0eb,#eae7e1);
+  background:#f1eee9;
+  text-align:center;
 }
-.foot-card{
-  max-width:660px;margin:0 auto;
-  display:flex;gap:18px;align-items:flex-start;
-  background:#fff;border:1px solid var(--line-2);border-radius:16px;
-  padding:22px 24px;
-  box-shadow:0 2px 6px rgba(28,25,20,.04),0 18px 40px -22px rgba(28,25,20,.18);
+.foot-note{
+  margin:0 auto;
+  max-width:720px;
+  font-size:11px;color:var(--dim-2);line-height:1.7;letter-spacing:.02em;
 }
-.foot-mark{
-  width:46px;height:46px;flex:none;border-radius:13px;
-  background:linear-gradient(170deg,#2a251e,#12100c);
-  color:#f4ecdd;display:grid;place-items:center;
-  font-size:19px;font-weight:600;letter-spacing:.02em;
-  font-family:"Monian Serif",Georgia,serif;
-  box-shadow:0 6px 16px -6px rgba(20,17,13,.5);
-}
-.foot-body{flex:1;min-width:0}
-.foot-title{
-  display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;
-  font-size:14px;font-weight:600;color:var(--txt);letter-spacing:.02em;
-}
-.foot-title em{
-  font-style:normal;font-size:10.5px;color:var(--dim-2);
-  letter-spacing:.2em;text-transform:uppercase;
-}
-.foot-desc{font-size:12px;color:var(--dim);line-height:1.75;margin-top:7px}
-.foot-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-.foot-tags span{
-  font-size:10.5px;color:var(--dim);letter-spacing:.02em;
-  border:1px solid var(--line-2);border-radius:20px;padding:2.5px 10px;background:#fbfaf8;
-}
-.foot-meta{
-  display:flex;flex-wrap:wrap;gap:14px;align-items:center;
-  margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
-  font-size:10.5px;color:var(--dim-2);letter-spacing:.04em;
-}
-.foot-meta a{color:var(--dim);text-decoration:none;border-bottom:1px solid var(--line-2);padding-bottom:1px}
-.foot-meta a:hover{color:var(--accent);border-color:rgba(154,116,52,.5)}
-.foot-meta .dot{width:3px;height:3px;border-radius:50%;background:var(--dim-2);opacity:.6}
-.foot-note{flex:1 1 100%;line-height:1.6;opacity:.9}
 
 /* ---------- 移动端 ---------- */
 @media (max-width:920px){
@@ -644,13 +611,11 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:5px}
   .toast{bottom:22px;top:auto}
   input[type=text],textarea,select{font-size:16px} /* 防止 iOS 缩放 */
   .wm-item input[type=text]{font-size:16px}
-  .foot{padding:20px 14px calc(28px + var(--safe-b))}
-  .foot-card{padding:18px;gap:14px;border-radius:14px}
-  .foot-mark{width:40px;height:40px;border-radius:11px;font-size:17px}
+  .foot{padding:16px 14px calc(20px + var(--safe-b))}
+  .foot-note{font-size:10.5px}
 }
 @media (max-width:380px){
   .quick-grid{grid-template-columns:repeat(2,1fr)}
-  .foot-card{flex-direction:column;gap:12px}
 }
 
 @media (prefers-reduced-motion:reduce){
