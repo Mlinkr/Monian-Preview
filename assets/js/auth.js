@@ -80,14 +80,20 @@
 
   function addLogout() {
     if ($('#mnLogout')) return;
-    const foot = $('.foot');
-    if (!foot) return;
+    const host = $('.top-actions') || $('.foot');
+    if (!host) return;
     const b = document.createElement('button');
     b.id = 'mnLogout';
-    b.textContent = '退出登录';
-    b.style.cssText = 'background:none;border:none;color:#9a9184;font-size:12px;cursor:pointer;text-decoration:underline;margin-left:12px;';
+    b.type = 'button';
+    if (host.classList.contains('top-actions')) {
+      b.className = 'btn btn-sm btn-ghost';
+      b.textContent = '退出';
+    } else {
+      b.textContent = '退出登录';
+      b.style.cssText = 'background:none;border:none;color:#9a9184;font-size:12px;cursor:pointer;text-decoration:underline;margin-left:12px;';
+    }
     b.addEventListener('click', () => { clearSession(); location.reload(); });
-    foot.appendChild(b);
+    host.appendChild(b);
   }
 
   async function tryAuto(data) {
