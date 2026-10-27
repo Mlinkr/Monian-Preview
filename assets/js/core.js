@@ -62,9 +62,8 @@
     dateText: '',
     priceText: '',
     wmPer: [
-      { id: 'd1', text: '{folder}', anchor: 'bl', size: 1.35, opacity: 0.95, weight: 600 },
-      { id: 'd2', text: '{date}', anchor: 'bl', size: 0.85, opacity: 0.72, weight: 400 },
-      { id: 'd3', text: '{price}', anchor: 'br', size: 1.0, opacity: 0.9, weight: 500 },
+      { id: 'd1', text: '{folder}', anchor: 'bl', size: 1.35, opacity: 0.95, weight: 600, color: '#ffffff' },
+      { id: 'd2', text: '{date}', anchor: 'bl', size: 0.85, opacity: 0.72, weight: 400, color: '#ffffff' },
     ],
     wmGlobal: [],
     header: {

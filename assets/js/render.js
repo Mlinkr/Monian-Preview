@@ -8,7 +8,7 @@
   const MN = window.MN;
   const U = MN.util;
 
-  const FONT = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif';
+  const FONT = '"LXGW WenKai","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif';
 
   /* ---------------- 平滑缩放绘制 ---------------- */
   function drawSmooth(ctx, src, sx, sy, sw, sh, dx, dy, dw, dh) {
@@ -278,7 +278,7 @@
           }
           // 大字号后接小字号时补一点间距，避免视觉上贴在一起
           const extra = prevFs > fs * 1.15 ? prevFs * 0.13 : 0;
-          lines.push({ text: p, fs, lh: fs * 1.55, op: it.opacity == null ? 1 : it.opacity, weight: it.weight, extra });
+          lines.push({ text: p, fs, lh: fs * 1.55, op: it.opacity == null ? 1 : it.opacity, weight: it.weight, extra, color: it.color });
           prevFs = fs;
         }
       }
@@ -323,8 +323,10 @@
         ctx.shadowColor = 'rgba(0,0,0,.62)';
         ctx.shadowBlur = Math.max(1, ln.fs * 0.42);
         ctx.shadowOffsetY = Math.max(0.5, ln.fs * 0.04);
-        ctx.fillStyle = `rgba(255,255,255,${U.clamp(ln.op, 0, 1)})`;
+        ctx.globalAlpha = U.clamp(ln.op, 0, 1);
+        ctx.fillStyle = ln.color || '#ffffff';
         ctx.fillText(ln.text, x, baseline);
+        ctx.globalAlpha = 1;
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
         ctx.shadowOffsetY = 0;

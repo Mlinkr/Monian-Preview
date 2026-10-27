@@ -34,7 +34,6 @@
     assetInfo: $('#assetInfo'),
     folderName: $('#folderName'),
     dateText: $('#dateText'),
-    priceText: $('#priceText'),
     thumbs: $('#thumbs'),
     wmTabs: $('#wmTabs'),
     wmList: $('#wmList'),
@@ -195,7 +194,6 @@
     if (state.files.length) {
       el.folderName.value = state.folderName || '';
       el.dateText.value = state.dateText || '';
-      el.priceText.value = state.priceText || '';
     }
   }
 
@@ -243,10 +241,24 @@
       state.folderName = arr[0].name.replace(/\.[^.]+$/, '') || '素材预览';
     }
 
-    // 时间：取文件最新修改时间
-    const times = arr.map((f) => f.lastModified).filter((t) => t > 0);
-    if (times.length) state.dateText = U.fmtDate(Math.max(...times));
-    if (!state.dateText) state.dateText = U.fmtDate(Date.now());
+    // 从文件夹名解析【日期】名称，如 【20261027】张艺兴 → 时间 20261027 / 名称 张艺兴
+    function parseFolder(raw) {
+      const m = String(raw || '').match(/^[【\[]\s*([^】\]]+?)\s*[】\]]\s*(.+)$/);
+      if (m) return { date: m[1].trim(), name: m[2].trim() };
+      // 没有括号时尝试 开头 8 位日期 + 后续文字：20261027张艺兴
+      const m2 = String(raw || '').match(/^(\d{8}|\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2})\s*(.+)$/);
+      if (m2) return { date: m2[1].trim(), name: m2[2].trim() };
+      return { date: '', name: String(raw || '').trim() };
+    }
+    const parsed = parseFolder(state.folderName);
+    if (parsed.name) state.folderName = parsed.name;
+    if (parsed.date) {
+      state.dateText = parsed.date;
+    } else {
+      // 没解析出日期则回退用文件最新修改时间
+      const times = arr.map((f) => f.lastModified).filter((t) => t > 0);
+      state.dateText = times.length ? U.fmtDate(Math.max(...times)) : U.fmtDate(Date.now());
+    }
 
     // 排序
     arr.sort((a, b) => U.collator.compare(a.webkitRelativePath || a.name, b.webkitRelativePath || b.name));
@@ -335,10 +347,6 @@
     state.dateText = el.dateText.value;
     commit();
   });
-  el.priceText.addEventListener('input', () => {
-    state.priceText = el.priceText.value;
-    commit();
-  });
 
   /* ---------------- 水印列表 ---------------- */
   const ANCHORS = [
@@ -379,6 +387,8 @@
           <button class="wm-del" type="button" title="删除">×</button>
         </div>
         <div class="wm-item-bot">
+          <button class="wm-color-btn" type="button" title="文字颜色" style="--c:${U.esc(it.color || '#ffffff')}"></button>
+          <input type="color" class="wm-color" value="${U.esc(it.color || '#ffffff')}" title="文字颜色" hidden>
           <select class="wm-anchor"${free ? ' disabled' : ''}>
             ${ANCHORS.map(([v, t]) => `<option value="${v}"${it.anchor === v ? ' selected' : ''}>${t}</option>`).join('')}
           </select>
@@ -428,6 +438,8 @@
       if (isX) it.dx = +e.target.value; else it.dy = +e.target.value;
       const out = e.target.parentElement.querySelector('output');
       if (out) out.textContent = fmtPct(e.target.value);
+    } else if (e.target.classList.contains('wm-color')) {
+      it.color = e.target.value;
     } else if (e.target.classList.contains('wm-px') || e.target.classList.contains('wm-py')) {
       const isX = e.target.classList.contains('wm-px');
       if (isX) it.px = +e.target.value; else it.py = +e.target.value;
@@ -490,6 +502,13 @@
       return;
     }
 
+    const colorBtn = e.target.closest('.wm-color-btn');
+    if (colorBtn) {
+      const c = item.querySelector('.wm-color');
+      if (c) c.click();
+      return;
+    }
+
     const reset = e.target.closest('.wm-pos-reset');
     if (reset) {
       it.dx = 0;
@@ -516,6 +535,7 @@
       size: 1,
       opacity: 0.85,
       weight: 400,
+      color: '#ffffff',
     });
     renderWmList();
     commit(true);
@@ -782,14 +802,19 @@
   el.outFormat.addEventListener('change', () => {
     state.export.format = el.outFormat.value;
     el.qualityRow.style.display = state.export.format === 'png' ? 'none' : 'flex';
+    syncExpState();
     saveDebounced();
   });
+
+  function syncExpState() {
+    const b = $('#expState');
+    if (b) b.textContent = (state.export.format === 'png' ? 'PNG' : 'JPG') + ' ' + state.export.width;
+  }
 
   /* ---------------- 初始化控件 ---------------- */
   function syncUI() {
     el.folderName.value = state.folderName || '';
     el.dateText.value = state.dateText || '';
-    el.priceText.value = state.priceText || '';
     el.headerTitle.value = state.header.title || '';
     el.headerMeta.value = state.header.meta || '';
     setSlider('#cols', state.layout.cols);
@@ -803,6 +828,7 @@
     el.outWidth.value = String(state.export.width);
     el.outFormat.value = state.export.format;
     el.qualityRow.style.display = state.export.format === 'png' ? 'none' : 'flex';
+    syncExpState();
     syncQuickLayout();
     renderWmList();
     syncBaseUI();
@@ -1016,6 +1042,12 @@
 
   syncUI();
   scheduleRender();
+
+  // 霞鹜文楷加载完成后重绘一次画布，保证水印用上该字体
+  if (document.fonts && document.fonts.load) {
+    document.fonts.load('600 20px "LXGW WenKai"').then(() => scheduleRender()).catch(() => {});
+    document.fonts.ready.then(() => scheduleRender()).catch(() => {});
+  }
 
   // 暴露给调试
   MN.state = state;

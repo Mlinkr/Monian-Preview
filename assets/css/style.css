@@ -29,7 +29,7 @@ body{
   margin:0;
   background:var(--bg);
   color:var(--txt);
-  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+  font-family:"LXGW WenKai","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
   font-size:14px;
   line-height:1.55;
   -webkit-font-smoothing:antialiased;
@@ -321,6 +321,16 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border:none;border-ra
 .wm-slide span{font-size:10px;color:var(--dim-2);flex:none}
 .wm-slide input[type=range]{height:16px}
 .wm-slide input[type=range]::-webkit-slider-thumb{width:11px;height:11px;margin-top:-4px}
+
+/* 水印颜色 */
+.wm-color-btn{
+  width:20px;height:20px;flex:none;padding:0;border-radius:50%;
+  border:1px solid rgba(255,255,255,.28);
+  background:var(--c,#fff);cursor:pointer;
+  box-shadow:0 0 0 2px rgba(0,0,0,.25) inset;
+  transition:transform .15s;
+}
+.wm-color-btn:hover{transform:scale(1.12)}
 
 /* 自定义位置 */
 .wm-pos-chip{
