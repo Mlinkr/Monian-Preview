@@ -200,12 +200,13 @@
       const maxW = h === 'c' ? rect.w - pad * 2 : rect.w * 0.58 - pad;
 
       const lines = [];
+      let prevFs = 0;
       for (const it of list) {
         let fs = Math.max(6, baseSize * (it.size || 1));
         setFont(ctx, fs, it.weight || 400);
         const parts = String(it.txt).split('\n');
         for (const p of parts) {
-          if (!p) { lines.push({ text: '', fs, lh: fs * 0.7, op: 0 }); continue; }
+          if (!p) { lines.push({ text: '', fs, lh: fs * 0.7, op: 0, extra: 0 }); prevFs = fs; continue; }
           // 超宽自动缩字号
           let w = ctx.measureText(p).width;
           if (maxW > 0 && w > maxW) {
@@ -213,12 +214,15 @@
             setFont(ctx, fs, it.weight || 400);
             w = ctx.measureText(p).width;
           }
-          lines.push({ text: p, fs, lh: fs * 1.55, op: it.opacity == null ? 1 : it.opacity, weight: it.weight });
+          // 大字号后接小字号时补一点间距，避免视觉上贴在一起
+          const extra = prevFs > fs * 1.15 ? prevFs * 0.13 : 0;
+          lines.push({ text: p, fs, lh: fs * 1.55, op: it.opacity == null ? 1 : it.opacity, weight: it.weight, extra });
+          prevFs = fs;
         }
       }
       if (!lines.length) continue;
 
-      const totalH = lines.reduce((s, l) => s + l.lh, 0);
+      const totalH = lines.reduce((s, l) => s + l.lh + (l.extra || 0), 0);
       let y;
       if (v === 't') y = rect.y + pad;
       else if (v === 'b') y = rect.y + rect.h - pad - totalH;
@@ -230,6 +234,7 @@
       else { x = rect.x + rect.w / 2; align = 'center'; }
 
       for (const ln of lines) {
+        y += ln.extra || 0;
         if (!ln.text) { y += ln.lh; continue; }
         setFont(ctx, ln.fs, ln.weight || 400);
         const baseline = y + ln.fs * 1.16;
