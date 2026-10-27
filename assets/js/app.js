@@ -39,12 +39,21 @@
     wmTabs: $('#wmTabs'),
     wmList: $('#wmList'),
     savedHint: $('#savedHint'),
+    baseTabs: $('#baseTabs'),
+    baseState: $('#baseState'),
+    baseColor: $('#baseColor'),
+    swatches: $('#swatches'),
+    solidPanel: $('#solidPanel'),
+    tplPanel: $('#tplPanel'),
+    noneTip: $('#noneTip'),
+    showHead: $('#showHead'),
+    headFields: $('#headFields'),
     tplDrop: $('#tplDrop'),
     inputTpl: $('#inputTpl'),
     tplControls: $('#tplControls'),
     tplThumb: $('#tplThumb'),
     tplSize: $('#tplSize'),
-    tplState: $('#tplState'),
+    layoutState: $('#layoutState'),
     quickLayout: $('#quickLayout'),
     cols: $('#cols'),
     gap: $('#gap'),
@@ -52,6 +61,7 @@
     radius: $('#radius'),
     aspect: $('#aspect'),
     fill: $('#fill'),
+    lastRowFill: $('#lastRowFill'),
     headerTitle: $('#headerTitle'),
     headerMeta: $('#headerMeta'),
     outWidth: $('#outWidth'),
@@ -99,6 +109,7 @@
   function drawPreview() {
     const stageEl = el.stageWrap.closest('.stage');
     if (stageEl) stageEl.classList.toggle('is-empty', !state.files.length);
+    syncJump();
 
     if (!state.files.length) {
       el.stageCanvas.hidden = true;
@@ -340,6 +351,13 @@
     return wmTab === 'per' ? state.wmPer : state.wmGlobal;
   }
 
+  const wmPosOpen = new Set();
+
+  function fmtPct(v) {
+    const n = Math.round(+v || 0);
+    return (n > 0 ? '+' : '') + n + '%';
+  }
+
   function renderWmList() {
     const list = wmListRef();
     if (!list.length) {
@@ -347,20 +365,44 @@
       return;
     }
     el.wmList.innerHTML = list
-      .map((it, i) => `
+      .map((it, i) => {
+        const dx = +it.dx || 0;
+        const dy = +it.dy || 0;
+        const free = !!it.free;
+        const px = it.px == null ? 8 : +it.px;
+        const py = it.py == null ? 92 : +it.py;
+        const open = wmPosOpen.has(it.id);
+        return `
       <div class="wm-item" data-i="${i}">
         <div class="wm-item-top">
           <input type="text" class="wm-text" value="${U.esc(it.text)}" placeholder="输入水印文字，可用占位符">
           <button class="wm-del" type="button" title="删除">×</button>
         </div>
         <div class="wm-item-bot">
-          <select class="wm-anchor">
+          <select class="wm-anchor"${free ? ' disabled' : ''}>
             ${ANCHORS.map(([v, t]) => `<option value="${v}"${it.anchor === v ? ' selected' : ''}>${t}</option>`).join('')}
           </select>
           <div class="wm-slide"><span>字号</span><input type="range" class="wm-size" min="0.5" max="2.6" step="0.05" value="${it.size || 1}"></div>
           <div class="wm-slide"><span>透明</span><input type="range" class="wm-op" min="0.05" max="1" step="0.05" value="${it.opacity == null ? 0.9 : it.opacity}"></div>
+          <button class="wm-pos-chip${open ? ' on' : ''}" type="button" title="自定义位置">位置</button>
         </div>
-      </div>`)
+        <div class="wm-pos"${open ? '' : ' hidden'}>
+          <div class="wm-pos-mode">
+            <button type="button" class="wm-mode-btn${free ? '' : ' on'}" data-mode="anchor">九宫格</button>
+            <button type="button" class="wm-mode-btn${free ? ' on' : ''}" data-mode="free">自由定位</button>
+          </div>
+          <div class="wm-pos-body"${free ? ' hidden' : ''}>
+            <div class="wm-pos-line"><label>左右</label><input type="range" class="wm-dx" min="-50" max="50" step="1" value="${dx}"><output>${fmtPct(dx)}</output></div>
+            <div class="wm-pos-line"><label>上下</label><input type="range" class="wm-dy" min="-50" max="50" step="1" value="${dy}"><output>${fmtPct(dy)}</output></div>
+          </div>
+          <div class="wm-pos-free"${free ? '' : ' hidden'}>
+            <div class="wm-pos-line"><label>横向</label><input type="range" class="wm-px" min="0" max="100" step="1" value="${px}"><output>${Math.round(px)}%</output></div>
+            <div class="wm-pos-line"><label>纵向</label><input type="range" class="wm-py" min="0" max="100" step="1" value="${py}"><output>${Math.round(py)}%</output></div>
+          </div>
+          <button class="wm-pos-reset" type="button">归零</button>
+        </div>
+      </div>`;
+      })
       .join('');
   }
 
@@ -381,7 +423,17 @@
     if (e.target.classList.contains('wm-text')) it.text = e.target.value;
     else if (e.target.classList.contains('wm-size')) it.size = +e.target.value;
     else if (e.target.classList.contains('wm-op')) it.opacity = +e.target.value;
-    else return;
+    else if (e.target.classList.contains('wm-dx') || e.target.classList.contains('wm-dy')) {
+      const isX = e.target.classList.contains('wm-dx');
+      if (isX) it.dx = +e.target.value; else it.dy = +e.target.value;
+      const out = e.target.parentElement.querySelector('output');
+      if (out) out.textContent = fmtPct(e.target.value);
+    } else if (e.target.classList.contains('wm-px') || e.target.classList.contains('wm-py')) {
+      const isX = e.target.classList.contains('wm-px');
+      if (isX) it.px = +e.target.value; else it.py = +e.target.value;
+      const out = e.target.parentElement.querySelector('output');
+      if (out) out.textContent = Math.round(+e.target.value) + '%';
+    } else return;
     commit();
   });
 
@@ -396,17 +448,70 @@
   });
 
   el.wmList.addEventListener('click', (e) => {
-    if (!e.target.classList.contains('wm-del')) return;
     const item = e.target.closest('.wm-item');
-    wmListRef().splice(+item.dataset.i, 1);
-    renderWmList();
-    commit(true);
+    if (!item) return;
+    const it = wmListRef()[+item.dataset.i];
+    if (!it) return;
+
+    if (e.target.classList.contains('wm-del')) {
+      wmPosOpen.delete(it.id);
+      wmListRef().splice(+item.dataset.i, 1);
+      renderWmList();
+      commit(true);
+      return;
+    }
+
+    const chip = e.target.closest('.wm-pos-chip');
+    if (chip) {
+      const panel = item.querySelector('.wm-pos');
+      const open = panel.hidden;
+      panel.hidden = !open;
+      chip.classList.toggle('on', open);
+      if (open) wmPosOpen.add(it.id); else wmPosOpen.delete(it.id);
+      return;
+    }
+
+    // 切换 九宫格 / 自由定位
+    const modeBtn = e.target.closest('.wm-mode-btn');
+    if (modeBtn) {
+      const toFree = modeBtn.dataset.mode === 'free';
+      it.free = toFree;
+      if (toFree && it.px == null) { it.px = 8; it.py = 92; }
+      renderWmList();
+      // 重新渲染后展开位置面板
+      const again = el.wmList.querySelector(`.wm-item[data-i="${item.dataset.i}"]`);
+      if (again) {
+        const p2 = again.querySelector('.wm-pos');
+        if (p2) p2.hidden = false;
+        const c2 = again.querySelector('.wm-pos-chip');
+        if (c2) c2.classList.add('on');
+      }
+      commit(true);
+      return;
+    }
+
+    const reset = e.target.closest('.wm-pos-reset');
+    if (reset) {
+      it.dx = 0;
+      it.dy = 0;
+      it.px = 8;
+      it.py = 92;
+      const dx = item.querySelector('.wm-dx');
+      const dy = item.querySelector('.wm-dy');
+      const px = item.querySelector('.wm-px');
+      const py = item.querySelector('.wm-py');
+      if (dx) { dx.value = 0; dx.parentElement.querySelector('output').textContent = fmtPct(0); }
+      if (dy) { dy.value = 0; dy.parentElement.querySelector('output').textContent = fmtPct(0); }
+      if (px) { px.value = 8; px.parentElement.querySelector('output').textContent = '8%'; }
+      if (py) { py.value = 92; py.parentElement.querySelector('output').textContent = '92%'; }
+      commit(true);
+    }
   });
 
   $('#btnWmAdd').addEventListener('click', () => {
     wmListRef().push({
       id: U.uid(),
-      text: wmTab === 'per' ? '{folder}' : '莫念 MONIAN',
+      text: '{folder}',
       anchor: wmTab === 'per' ? 'tl' : 'bc',
       size: 1,
       opacity: 0.85,
@@ -433,7 +538,83 @@
     MN.toast('已清空，可重新输入');
   });
 
-  /* ---------------- 模板 ---------------- */
+  /* ---------------- 底图 ---------------- */
+  function canvasCfg() {
+    if (!state.canvas) state.canvas = { mode: 'solid', color: '#0f0f14', header: true };
+    return state.canvas;
+  }
+
+  function syncBaseUI() {
+    const c = canvasCfg();
+    const mode = c.mode || 'solid';
+    $$('button', el.baseTabs).forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
+    el.solidPanel.hidden = mode !== 'solid';
+    el.tplPanel.hidden = mode !== 'image';
+    el.noneTip.hidden = mode !== 'none';
+
+    el.baseColor.value = c.color || '#0f0f14';
+    el.showHead.checked = c.header !== false;
+    el.headFields.hidden = !el.showHead.checked;
+    $$('button', el.swatches).forEach((b) => {
+      b.classList.toggle('on', (b.dataset.c || '').toLowerCase() === String(c.color || '').toLowerCase());
+    });
+
+    el.baseState.textContent = mode === 'solid' ? '纯色' : mode === 'image' ? '自定义' : '无底图';
+    el.baseState.classList.toggle('on', mode !== 'none');
+
+    const has = !!(state.template && state.template.img);
+    el.tplControls.hidden = !has;
+    el.tplDrop.hidden = has;
+    if (has) {
+      if (!el.tplThumb.getAttribute('src')) {
+        const c2 = document.createElement('canvas');
+        c2.width = 108; c2.height = 108;
+        const cx = c2.getContext('2d');
+        cx.fillStyle = '#0b0b0f';
+        cx.fillRect(0, 0, 108, 108);
+        const s = Math.min(108 / state.template.w, 108 / state.template.h);
+        const dw = state.template.w * s, dh = state.template.h * s;
+        cx.drawImage(state.template.img, (108 - dw) / 2, (108 - dh) / 2, dw, dh);
+        el.tplThumb.src = c2.toDataURL('image/jpeg', 0.8);
+      }
+      el.tplSize.textContent = `${state.template.w} × ${state.template.h} · ${state.template.aspect.toFixed(2)}:1`;
+      setSlider('#padT', state.template.pad.t);
+      setSlider('#padR', state.template.pad.r);
+      setSlider('#padB', state.template.pad.b);
+      setSlider('#padL', state.template.pad.l);
+    } else {
+      el.tplThumb.removeAttribute('src');
+    }
+  }
+
+  el.baseTabs.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    canvasCfg().mode = b.dataset.mode;
+    syncBaseUI();
+    commit(true);
+  });
+
+  el.baseColor.addEventListener('input', (e) => {
+    canvasCfg().color = e.target.value;
+    syncBaseUI();
+    commit();
+  });
+
+  el.swatches.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    canvasCfg().color = b.dataset.c;
+    syncBaseUI();
+    commit(true);
+  });
+
+  el.showHead.addEventListener('change', (e) => {
+    canvasCfg().header = e.target.checked;
+    el.headFields.hidden = !e.target.checked;
+    commit(true);
+  });
+
   el.tplDrop.addEventListener('click', () => el.inputTpl.click());
 
   el.inputTpl.addEventListener('change', async (e) => {
@@ -454,51 +635,23 @@
         w: r.w,
         h: r.h,
       };
+      canvasCfg().mode = 'image';
       await MN.idb.set('template', file);
-      syncTemplateUI();
+      syncBaseUI();
       commit(true);
-      MN.toast('模板已应用');
+      MN.toast('底图已应用');
     } catch (err) {
-      MN.toast('模板图片无法解析，请换成 JPG / PNG');
-    }
-  }
-
-  function syncTemplateUI() {
-    const t = state.template;
-    const has = !!(t && t.img);
-    el.tplControls.hidden = !has;
-    el.tplState.textContent = has ? '已启用' : '未使用';
-    el.tplState.classList.toggle('on', has);
-    el.tplDrop.hidden = has;
-    if (has) {
-      if (!el.tplThumb.src) {
-        // 用 canvas 生成小预览，避免再存一份 URL
-        const c = document.createElement('canvas');
-        c.width = 108; c.height = 108;
-        const cx = c.getContext('2d');
-        cx.fillStyle = '#0b0b0f';
-        cx.fillRect(0, 0, 108, 108);
-        const s = Math.min(108 / t.w, 108 / t.h);
-        const dw = t.w * s, dh = t.h * s;
-        cx.drawImage(t.img, (108 - dw) / 2, (108 - dh) / 2, dw, dh);
-        el.tplThumb.src = c.toDataURL('image/jpeg', 0.8);
-      }
-      el.tplSize.textContent = `${t.w} × ${t.h} · ${t.aspect.toFixed(2)}:1`;
-      setSlider('#padT', t.pad.t);
-      setSlider('#padR', t.pad.r);
-      setSlider('#padB', t.pad.b);
-      setSlider('#padL', t.pad.l);
-    } else {
-      el.tplThumb.removeAttribute('src');
+      MN.toast('底图图片无法解析，请换成 JPG / PNG');
     }
   }
 
   $('#btnTplRemove').addEventListener('click', async () => {
     state.template = null;
     await MN.idb.del('template');
-    syncTemplateUI();
+    el.tplThumb.removeAttribute('src');
+    syncBaseUI();
     commit(true);
-    MN.toast('已移除模板');
+    MN.toast('已移除底图');
   });
 
   [['#padT', 't'], ['#padR', 'r'], ['#padB', 'b'], ['#padL', 'l']].forEach(([sel, key]) => {
@@ -516,22 +669,22 @@
     scheduleRender();
   });
 
-  // 从 IndexedDB 恢复模板
+  // 从 IndexedDB 恢复底图
   (async function restoreTemplate() {
     if (!state.template) return;
     const blob = await MN.idb.get('template');
-    if (!blob) { state.template = null; return; }
+    if (!blob) { state.template = null; syncBaseUI(); return; }
     try {
       const r = await MN.loadBitmap(blob, 3000);
       state.template.img = r.img;
       state.template.w = r.w;
       state.template.h = r.h;
       state.template.aspect = r.w / r.h;
-      syncTemplateUI();
+      syncBaseUI();
       scheduleRender();
     } catch (e) {
       state.template = null;
-      syncTemplateUI();
+      syncBaseUI();
     }
   })();
 
@@ -594,6 +747,7 @@
     $$('button', el.quickLayout).forEach((b) => {
       b.classList.toggle('on', +b.dataset.cols === +state.layout.cols);
     });
+    if (el.layoutState) el.layoutState.textContent = `${state.layout.cols} 列`;
   }
 
   el.aspect.addEventListener('change', () => {
@@ -603,6 +757,11 @@
 
   el.fill.addEventListener('change', () => {
     state.layout.fill = el.fill.value;
+    commit(true);
+  });
+
+  el.lastRowFill.addEventListener('change', () => {
+    state.layout.lastRow = el.lastRowFill.checked ? 'fill' : 'center';
     commit(true);
   });
 
@@ -640,12 +799,13 @@
     setSlider('#quality', state.export.quality);
     el.aspect.value = String(state.layout.aspect);
     el.fill.value = state.layout.fill || 'cover';
+    el.lastRowFill.checked = state.layout.lastRow === 'fill';
     el.outWidth.value = String(state.export.width);
     el.outFormat.value = state.export.format;
     el.qualityRow.style.display = state.export.format === 'png' ? 'none' : 'flex';
     syncQuickLayout();
     renderWmList();
-    syncTemplateUI();
+    syncBaseUI();
     renderThumbs();
     updateOutInfo();
   }
@@ -682,7 +842,7 @@
   }
 
   function fileName(ext) {
-    const base = (state.folderName || '莫念预览').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40);
+    const base = (state.folderName || 'Monian').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40);
     const d = new Date();
     const stamp = `${d.getFullYear()}${U.pad2(d.getMonth() + 1)}${U.pad2(d.getDate())}`;
     return `${base}_${state.layout.cols}列_${stamp}.${ext}`;
@@ -764,6 +924,7 @@
     if (!confirm('确定要清空所有素材与设置吗？（水印文字也会重置）')) return;
     MN.store.clear();
     MN.idb.del('template');
+    wmPosOpen.clear();
     const d = MN.store.defaultState();
     Object.keys(d).forEach((k) => { state[k] = d[k]; });
     state.files.forEach((f) => f.thumbUrl && URL.revokeObjectURL(f.thumbUrl));
@@ -795,6 +956,55 @@
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(scheduleRender, 180);
   });
+
+  /* ---------------- 折叠卡片 ---------------- */
+  const CARD_KEY = 'monian.cards.v1';
+  let cardState = {};
+  try {
+    const raw = localStorage.getItem(CARD_KEY);
+    cardState = raw ? (JSON.parse(raw) || {}) : {};
+  } catch (e) { cardState = {}; }
+  // 首次使用时 03 / 04 默认收起，避免把预览挤出屏幕
+  if (!Object.keys(cardState).length) cardState = { base: true, layout: true };
+
+  $$('.card.collapsible').forEach((card) => {
+    const id = card.dataset.card;
+    const hd = $('.card-hd', card);
+    const apply = (collapsed, remember) => {
+      card.classList.toggle('collapsed', collapsed);
+      hd.setAttribute('aria-expanded', String(!collapsed));
+      if (remember) {
+        cardState[id] = collapsed;
+        try { localStorage.setItem(CARD_KEY, JSON.stringify(cardState)); } catch (e) {}
+      }
+    };
+    if (cardState[id]) apply(true, false);
+    const toggle = () => apply(!card.classList.contains('collapsed'), true);
+    hd.addEventListener('click', toggle);
+    hd.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+  });
+
+  /* ---------------- 回到预览 ---------------- */
+  const btnJump = $('#btnJump');
+  function syncJump() {
+    if (!btnJump) return;
+    const isMobile = window.matchMedia('(max-width: 920px)').matches;
+    const show = isMobile && state.files.length > 0 && window.scrollY > 220;
+    btnJump.hidden = !show;
+    btnJump.classList.toggle('show', show);
+  }
+  if (btnJump) {
+    btnJump.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    let jumpTick = 0;
+    window.addEventListener('scroll', () => {
+      if (jumpTick) return;
+      jumpTick = requestAnimationFrame(() => { jumpTick = 0; syncJump(); });
+    }, { passive: true });
+  }
 
   /* ---------------- 启动 ---------------- */
   const supportsDir = 'webkitdirectory' in document.createElement('input');

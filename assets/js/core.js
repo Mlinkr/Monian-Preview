@@ -68,12 +68,15 @@
     ],
     wmGlobal: [],
     header: {
-      eyebrow: 'MONIAN PREVIEW',
       title: '',
       meta: '',
-      footer: '莫念 MONIAN',
     },
-    template: null, // { aspect, pad:{t,r,b,l} }
+    canvas: {
+      mode: 'solid',      // solid: 纯色底图 / image: 自定义底图 / none: 无底图
+      color: '#0f0f14',
+      header: true,       // 纯色模式下是否绘制标题栏
+    },
+    template: null, // { aspect, pad:{t,r,b,l}, img, w, h }
     layout: {
       cols: 3,
       gap: 1.2,
@@ -81,6 +84,7 @@
       radius: 0.4,
       aspect: 'auto',
       fill: 'cover',
+      lastRow: 'center',   // center: 末行居中保持原尺寸 / fill: 末行铺满整行
     },
     export: { width: 1600, format: 'jpeg', quality: 0.92 },
   };
@@ -108,7 +112,11 @@
       try {
         const raw = localStorage.getItem(KEY);
         if (!raw) return deepClone(DEFAULT_STATE);
-        return mergeDefault(DEFAULT_STATE, JSON.parse(raw));
+        const parsed = JSON.parse(raw);
+        const out = mergeDefault(DEFAULT_STATE, parsed);
+        // 老版本没有 canvas 字段：原来用了模板图的继续用自定义底图
+        if (!parsed.canvas) out.canvas.mode = parsed.template ? 'image' : 'solid';
+        return out;
       } catch (e) {
         return deepClone(DEFAULT_STATE);
       }

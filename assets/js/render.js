@@ -84,8 +84,10 @@
     const n = st.files.length;
     const L = st.layout;
     const radius = (W * L.radius) / 100;
+    const mode = (st.canvas && st.canvas.mode) || 'solid';
 
-    if (st.template && st.template.img) {
+    // 自定义底图：画布比例由底图决定，图片放进设定的放置区域
+    if (mode === 'image' && st.template && st.template.img) {
       const asp = st.template.aspect || 1.4;
       const H = Math.max(1, Math.round(W / asp));
       const p = st.template.pad || { t: 20, r: 4, b: 12, l: 4 };
@@ -106,17 +108,17 @@
 
       // 保持比例：按图片比例反推格子尺寸，保证不裁剪，整块居中
       if (L.fill === 'contain') {
-        let asp;
+        let asp2;
         if (L.aspect === 'auto') {
           const f = st.files[0];
-          asp = f && f.w && f.h ? f.w / f.h : 0.75;
-          asp = U.clamp(asp, 0.4, 2.4);
+          asp2 = f && f.w && f.h ? f.w / f.h : 0.75;
+          asp2 = U.clamp(asp2, 0.4, 2.4);
         } else {
-          asp = parseFloat(L.aspect) || 0.75;
+          asp2 = parseFloat(L.aspect) || 0.75;
         }
         const maxH = Math.max(1, (area.h - gap * (rows - 1)) / rows);
-        ch = cellW / asp;
-        if (ch > maxH) { ch = maxH; cw = ch * asp; }
+        ch = cellW / asp2;
+        if (ch > maxH) { ch = maxH; cw = ch * asp2; }
         const gridH = rows * ch + (rows - 1) * gap;
         gridTop = area.y + Math.max(0, (area.h - gridH) / 2);
       }
@@ -133,10 +135,12 @@
           w: cw, h: ch, i,
         });
       }
-      return { W, H, cells, area, mode: 'template', radius, gap, cols, rows, cellW, cellH, gridTop };
+      return { W, H, cells, area, mode: 'image', radius, gap, cols, rows, cellW, cellH, gridTop };
     }
 
-    const margin = (W * L.margin) / 100;
+    // 纯色底图 / 无底图
+    const noBase = mode === 'none';
+    const margin = noBase ? 0 : (W * L.margin) / 100;
     const gap = (W * L.gap) / 100;
     const cols = Math.max(1, Math.min(L.cols, n || 1));
     const rows = Math.max(1, Math.ceil(n / cols));
@@ -146,16 +150,38 @@
     if (L.aspect === 'auto') {
       const f = st.files[0];
       aspect = f && f.w && f.h ? f.w / f.h : 0.75;
-      aspect = U.clamp(aspect, 0.45, 2.2);
+      // 收窄范围：避免极长条比例把格子拉得过高，导致整张图很长
+      aspect = U.clamp(aspect, 0.55, 1.8);
     } else {
       aspect = parseFloat(L.aspect) || 0.75;
     }
-    const cellH = cellW / aspect;
+    let cellH = cellW / aspect;
 
-    const headerH = W * 0.158;
-    const footerH = W * 0.082;
+    const title = ((st.header && st.header.title) || '').trim();
+    const meta = ((st.header && st.header.meta) || '').trim();
+    const hasHead = !noBase && (!st.canvas || st.canvas.header !== false) &&
+      !!(title || meta || st.folderName);
+
+    const headerH = hasHead ? W * 0.152 : 0;
+    const footGap = noBase ? 0 : W * 0.068;
+    let padTop = margin + headerH + (hasHead ? gap * 1.6 : 0);
+    let padBottom = noBase ? 0 : gap * 2 + footGap + margin;
+
+    // 纯色底图且开启标题栏时：限制整体高宽比，避免竖图 + 多行导致下半截空出一大片
+    if (!noBase && hasHead) {
+      const maxRatio = 2.25;
+      const fixed = padTop + padBottom + (rows - 1) * gap;
+      const maxGridH = W * maxRatio - fixed;
+      if (rows * cellH > maxGridH) {
+        const fitH = Math.max(W * 0.1, maxGridH / rows);
+        cellH = fitH;
+        padTop = margin + headerH + (hasHead ? gap * 1.6 : 0);
+        padBottom = noBase ? 0 : gap * 2 + footGap + margin;
+      }
+    }
+
     const gridH = rows * cellH + (rows - 1) * gap;
-    const H = Math.round(margin + headerH + gap * 1.6 + gridH + gap * 2 + footerH + margin);
+    const H = Math.max(1, Math.round(padTop + gridH + padBottom));
 
     const cells = [];
     for (let i = 0; i < n; i++) {
@@ -165,17 +191,45 @@
       const startX = (W - rowW) / 2;
       cells.push({
         x: startX + c * (cellW + gap),
-        y: margin + headerH + gap * 1.6 + r * (cellH + gap),
+        y: padTop + r * (cellH + gap),
         w: cellW, h: cellH, i,
       });
     }
+
+    // 末行不满格：可选「铺满整行」（等比放大）
+    let finalH = H;
+    if (L.lastRow === 'fill' && n > cols && n % cols !== 0) {
+      const lastRow = rows - 1;
+      const inRow = n - lastRow * cols;
+      const fullW = cols * cellW + (cols - 1) * gap;
+      const rowW0 = inRow * cellW + (inRow - 1) * gap;
+      const k = fullW / rowW0;
+      // 放大后如果有图片总高超过上限则放弃
+      const bh = cellH * k;
+      if (padTop + gridH + (bh - cellH) + padBottom <= W * 2.6) {
+        const baseY = padTop + lastRow * (cellH + gap);
+        cells.forEach((cell) => {
+          if (cell.i >= lastRow * cols) {
+            cell.w *= k;
+            cell.h = bh;
+            cell.y = baseY;
+          }
+        });
+        finalH = Math.max(1, Math.round(padTop + gridH + (bh - cellH) + padBottom));
+      }
+    }
+
     return {
-      W, H, cells, mode: 'plain', radius, gap, cols, rows, cellW, cellH, margin,
-      headerH, footerH,
+      W, H: finalH, cells, mode: noBase ? 'none' : 'solid', radius, gap, cols, rows, cellW, cellH, margin,
+      headerH, hasHead,
       headerTop: margin,
-      footerTop: H - margin - footerH,
-      gridTop: margin + headerH + gap * 1.6,
+      gridTop: padTop,
     };
+  }
+
+  function measureLineW(ctx, ln) {
+    setFont(ctx, ln.fs, ln.weight || 400);
+    return ctx.measureText(ln.text).width;
   }
 
   /* ---------------- 水印分组绘制 ---------------- */
@@ -187,15 +241,23 @@
       const txt = subst(it.text, vars);
       if (!txt || !txt.trim()) continue;
       const a = it.anchor || 'bl';
-      (groups[a] = groups[a] || []).push(Object.assign({}, it, { txt }));
+      const dx = U.clamp(+(it.dx || 0), -60, 60);
+      const dy = U.clamp(+(it.dy || 0), -60, 60);
+      const free = !!it.free;
+      const px = U.clamp(it.px == null ? 8 : +it.px, 0, 100);
+      const py = U.clamp(it.py == null ? 92 : +it.py, 0, 100);
+      const key = `${a}|${dx}|${dy}|${free ? 1 : 0}|${free ? px.toFixed(1) + '_' + py.toFixed(1) : ''}`;
+      if (!groups[key]) groups[key] = { anchor: a, dx, dy, free, px, py, list: [] };
+      groups[key].list.push(Object.assign({}, it, { txt }));
     }
 
     const pad = baseSize * (padMul == null ? 1.5 : padMul);
 
-    for (const anchor in groups) {
-      const list = groups[anchor];
-      const v = anchor[0];
-      const h = anchor[1];
+    for (const key in groups) {
+      const G = groups[key];
+      const list = G.list;
+      const v = G.anchor[0];
+      const h = G.anchor[1];
       // 左右分列时限制单行宽度，避免两侧文字撞在一起
       const maxW = h === 'c' ? rect.w - pad * 2 : rect.w * 0.58 - pad;
 
@@ -223,15 +285,32 @@
       if (!lines.length) continue;
 
       const totalH = lines.reduce((s, l) => s + l.lh + (l.extra || 0), 0);
-      let y;
-      if (v === 't') y = rect.y + pad;
-      else if (v === 'b') y = rect.y + rect.h - pad - totalH;
-      else y = rect.y + (rect.h - totalH) / 2;
+      const maxLineW = lines.reduce((m, l) => Math.max(m, l.text ? measureLineW(ctx, l) : 0), 0);
 
-      let x, align;
-      if (h === 'l') { x = rect.x + pad; align = 'left'; }
-      else if (h === 'r') { x = rect.x + rect.w - pad; align = 'right'; }
-      else { x = rect.x + rect.w / 2; align = 'center'; }
+      let y, x, align;
+      if (G.free) {
+        // 自由定位：px/py 是文字块左上角的百分比位置，整块按自身大小贴到位
+        const bw = maxLineW;
+        const bh = totalH;
+        x = rect.x + (rect.w * G.px) / 100;
+        y = rect.y + (rect.h * G.py) / 100;
+        // 防止跑出画面
+        x = U.clamp(x, rect.x + pad * 0.3, rect.x + Math.max(pad * 0.3, rect.w - bw - pad * 0.3));
+        y = U.clamp(y, rect.y + pad * 0.3, rect.y + Math.max(pad * 0.3, rect.h - bh - pad * 0.3));
+        align = 'left';
+      } else {
+        if (v === 't') y = rect.y + pad;
+        else if (v === 'b') y = rect.y + rect.h - pad - totalH;
+        else y = rect.y + (rect.h - totalH) / 2;
+
+        if (h === 'l') { x = rect.x + pad; align = 'left'; }
+        else if (h === 'r') { x = rect.x + rect.w - pad; align = 'right'; }
+        else { x = rect.x + rect.w / 2; align = 'center'; }
+
+        // 自定义位置微调（相对当前格子的百分比）
+        x += (rect.w * G.dx) / 100;
+        y += (rect.h * G.dy) / 100;
+      }
 
       for (const ln of lines) {
         y += ln.extra || 0;
@@ -254,87 +333,68 @@
     }
   }
 
-  /* ---------------- 背景 ---------------- */
-  function paintPlainBg(ctx, W, H) {
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, '#121216');
-    g.addColorStop(0.45, '#0d0d11');
-    g.addColorStop(1, '#08080b');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-
-    const rg = ctx.createRadialGradient(W * 0.5, 0, 0, W * 0.5, 0, W * 0.85);
-    rg.addColorStop(0, 'rgba(216,177,117,.055)');
-    rg.addColorStop(1, 'rgba(216,177,117,0)');
-    ctx.fillStyle = rg;
-    ctx.fillRect(0, 0, W, H * 0.55);
+  /* ---------------- 背景 / 标题 ---------------- */
+  function isLightColor(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+    if (!m) return false;
+    const v = parseInt(m[1], 16);
+    const r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255;
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.6;
   }
 
   function paintHeader(ctx, lay, st) {
     const W = lay.W;
     const x0 = lay.margin;
     const x1 = W - lay.margin;
-    const top = lay.headerTop + W * 0.042;
-    const title = (st.header.title || st.folderName || '素材预览').trim();
-    const eyebrow = (st.header.eyebrow || '').trim();
+    const title = (st.header.title || st.folderName || '').trim();
     const metaLines = (st.header.meta || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    if (!title && !metaLines.length) return;
 
-    // 左侧 eyebrow
-    if (eyebrow) {
-      setFont(ctx, W * 0.0128, 500);
-      ctx.fillStyle = 'rgba(216,177,117,.82)';
+    const light = isLightColor(st.canvas && st.canvas.color);
+    const ink = light ? 'rgba(22,22,28,.94)' : '#f4f1ea';
+    const ink2 = light ? 'rgba(22,22,28,.86)' : 'rgba(240,240,246,.92)';
+    const ink3 = light ? 'rgba(22,22,28,.5)' : 'rgba(255,255,255,.55)';
+    const lineColor = light ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.09)';
+    const accent = light ? 'rgba(158,116,54,.8)' : 'rgba(216,177,117,.6)';
+
+    // 标题
+    if (title) {
+      const maxTitleW = W * (metaLines.length ? 0.56 : 0.9) - lay.margin * 2;
+      let ts = W * 0.047;
+      setFont(ctx, ts, 600);
+      let tw = measure(ctx, title).w;
+      if (tw > maxTitleW) { ts = Math.max(W * 0.022, ts * (maxTitleW / tw)); setFont(ctx, ts, 600); }
+
+      ctx.fillStyle = ink;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
-      drawSpaced(ctx, eyebrow.toUpperCase(), x0, top, W * 0.0052, 'left');
+      const baseline = lay.headerTop + lay.headerH * 0.615;
+      drawSpaced(ctx, title, x0, baseline, W * 0.0016, 'left');
     }
-
-    // 左侧标题
-    const maxTitleW = W * (metaLines.length ? 0.56 : 0.9);
-    let ts = W * 0.046;
-    setFont(ctx, ts, 600);
-    let tw = measure(ctx, title).w;
-    if (tw > maxTitleW) { ts = Math.max(W * 0.022, ts * (maxTitleW / tw)); setFont(ctx, ts, 600); }
-
-    ctx.fillStyle = '#f4f1ea';
-    ctx.textAlign = 'left';
-    drawSpaced(ctx, title, x0, top + W * 0.062, W * 0.0016, 'left');
 
     // 右侧信息
     if (metaLines.length) {
       const fs = W * 0.0152;
       const lh = fs * 1.62;
-      let y = top + fs * 0.2;
+      const total = (metaLines.length - 1) * lh;
+      let y = lay.headerTop + (lay.headerH - total) / 2 + fs * 0.3;
       ctx.textAlign = 'right';
       ctx.textBaseline = 'alphabetic';
       metaLines.forEach((line, i) => {
         setFont(ctx, fs, i === 0 ? 500 : 400);
-        ctx.fillStyle = i === 0 ? 'rgba(240,240,246,.92)' : 'rgba(255,255,255,.55)';
+        ctx.fillStyle = i === 0 ? ink2 : ink3;
         ctx.fillText(line, x1, y);
         y += lh;
       });
     }
 
-    // 分隔线
+    // 分隔线 + 金色短标记
     const ly = lay.headerTop + lay.headerH;
-    ctx.fillStyle = 'rgba(255,255,255,.09)';
-    ctx.fillRect(x0, ly, x1 - x0, Math.max(1, W * 0.0006));
-
-    // 左侧短的金色标记
-    ctx.fillStyle = 'rgba(216,177,117,.55)';
-    ctx.fillRect(x0, ly, W * 0.05, Math.max(1, W * 0.0006));
-  }
-
-  function paintFooter(ctx, lay, st) {
-    const W = lay.W;
-    const text = (st.header.footer || '').trim();
-    if (!text) return;
-    const y = lay.footerTop + lay.footerH * 0.55;
-    const fs = W * 0.0142;
-    setFont(ctx, fs, 400);
-    ctx.fillStyle = 'rgba(255,255,255,.34)';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    drawSpaced(ctx, text, W / 2, y, W * 0.0068, 'center');
+    const lw = Math.max(1, W * 0.0006);
+    ctx.fillStyle = lineColor;
+    ctx.fillRect(x0, ly, x1 - x0, lw);
+    ctx.fillStyle = accent;
+    ctx.fillRect(x0, ly, W * 0.05, lw);
   }
 
   /* ---------------- 主绘制 ---------------- */
@@ -344,16 +404,14 @@
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // 背景
-    if (lay.mode === 'template') {
+    // 背景：先铺底色，再叠自定义底图
+    ctx.fillStyle = (st.canvas && st.canvas.color) || '#0f0f14';
+    ctx.fillRect(0, 0, W, H);
+    if (lay.mode === 'image') {
       const t = st.template;
       if (t && t.img) {
         drawSmooth(ctx, t.img, 0, 0, t.img.naturalWidth || t.img.width, t.img.naturalHeight || t.img.height, 0, 0, W, H);
-      } else {
-        paintPlainBg(ctx, W, H);
       }
-    } else {
-      paintPlainBg(ctx, W, H);
     }
 
     // 每张图
@@ -409,10 +467,9 @@
       ctx.restore();
     }
 
-    // 无模板时的标题与页脚
-    if (lay.mode === 'plain') {
+    // 纯色底图的标题栏
+    if (lay.mode === 'solid' && lay.hasHead) {
       paintHeader(ctx, lay, st);
-      paintFooter(ctx, lay, st);
     }
 
     // 整图水印
@@ -428,7 +485,7 @@
     }
 
     // 参考线（不导出）
-    if (opts && opts.guides && lay.mode === 'template') {
+    if (opts && opts.guides && lay.mode === 'image') {
       ctx.save();
       ctx.strokeStyle = 'rgba(216,177,117,.55)';
       ctx.setLineDash([W * 0.012, W * 0.008]);

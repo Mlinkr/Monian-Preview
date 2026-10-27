@@ -8,13 +8,13 @@
 <meta name="description" content="上传文件夹，自动拼图并添加水印信息，一键生成高清预览长图。全部处理在浏览器本地完成，图片不会上传服务器。">
 <meta property="og:title" content="Monian · 拼图预览生成器">
 <meta property="og:description" content="上传文件夹，自动拼图并添加水印信息，一键生成高清预览长图。">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23d8b175'/%3E%3Ctext x='32' y='44' font-size='34' font-family='sans-serif' text-anchor='middle' fill='%230a0a0d'%3E%E8%8E%AB%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23d8b175'/%3E%3Ctext x='32' y='46' font-size='38' font-weight='700' font-family='Helvetica,Arial,sans-serif' text-anchor='middle' fill='%230a0a0d'%3EM%3C/text%3E%3C/svg%3E">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Monian">
-<link rel="stylesheet" href="assets/css/style.css?v=2">
+<link rel="stylesheet" href="assets/css/style.css?v=4">
 </head>
 <body>
 
@@ -100,40 +100,80 @@
       </div>
     </section>
 
-    <!-- 03 模板 -->
-    <section class="card">
-      <div class="card-hd">
+    <!-- 03 底图与标题 -->
+    <section class="card collapsible" data-card="base">
+      <div class="card-hd" role="button" tabindex="0" aria-expanded="true">
         <span class="step">03</span>
-        <h2>背景模板</h2>
-        <span class="badge" id="tplState">未使用</span>
+        <h2>底图与标题</h2>
+        <span class="badge on" id="baseState">纯色</span>
+        <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5"/></svg>
       </div>
       <div class="card-bd">
-        <div class="tpl-drop" id="tplDrop">
-          <span>上传背景模板图片（可留空，直接拼图）</span>
+        <div class="seg" id="baseTabs">
+          <button class="on" data-mode="solid" type="button">纯色底图</button>
+          <button data-mode="image" type="button">自定义底图</button>
+          <button data-mode="none" type="button">无底图</button>
         </div>
-        <input type="file" id="inputTpl" accept="image/*" hidden>
 
-        <div id="tplControls" hidden>
-          <div class="tpl-preview">
-            <img id="tplThumb" alt="模板预览">
-            <div class="tpl-preview-info"><span id="tplSize">—</span></div>
-            <button class="mini danger" id="btnTplRemove" type="button">移除</button>
+        <div id="solidPanel">
+          <div class="color-row">
+            <label for="baseColor">底色</label>
+            <input type="color" id="baseColor" value="#0f0f14">
+            <div class="swatches" id="swatches">
+              <button type="button" data-c="#08080b" style="background:#08080b"></button>
+              <button type="button" data-c="#0f0f14" style="background:#0f0f14"></button>
+              <button type="button" data-c="#141b26" style="background:#141b26"></button>
+              <button type="button" data-c="#2a1a1c" style="background:#2a1a1c"></button>
+              <button type="button" data-c="#1b2420" style="background:#1b2420"></button>
+              <button type="button" data-c="#efe9e0" style="background:#efe9e0"></button>
+            </div>
           </div>
-          <p class="section-label">图片放置区域（相对画布百分比）</p>
-          <div class="slider-row"><label>上</label><input type="range" id="padT" min="0" max="60" step="0.5"><output></output></div>
-          <div class="slider-row"><label>右</label><input type="range" id="padR" min="0" max="40" step="0.5"><output></output></div>
-          <div class="slider-row"><label>下</label><input type="range" id="padB" min="0" max="60" step="0.5"><output></output></div>
-          <div class="slider-row"><label>左</label><input type="range" id="padL" min="0" max="40" step="0.5"><output></output></div>
-          <label class="check"><input type="checkbox" id="showGuides"><span>在预览中显示放置区域参考线（不会导出）</span></label>
+          <label class="check"><input type="checkbox" id="showHead" checked><span>显示顶部标题与右侧信息</span></label>
+
+          <div id="headFields">
+            <div class="row">
+              <label for="headerTitle">大标题</label>
+              <input type="text" id="headerTitle" placeholder="留空则使用素材名称">
+            </div>
+            <div class="row align-start">
+              <label for="headerMeta">右上角信息</label>
+              <textarea id="headerMeta" rows="3" placeholder="每行一条，如：&#10;价格 xxx&#10;联系方式 xxx..."></textarea>
+            </div>
+          </div>
         </div>
+
+        <div id="tplPanel" hidden>
+          <div class="tpl-drop" id="tplDrop">
+            <span>上传自己的底图（可带图案或个人水印）</span>
+          </div>
+          <input type="file" id="inputTpl" accept="image/*" hidden>
+
+          <div id="tplControls" hidden>
+            <div class="tpl-preview">
+              <img id="tplThumb" alt="底图预览">
+              <div class="tpl-preview-info"><span id="tplSize">—</span></div>
+              <button class="mini danger" id="btnTplRemove" type="button">移除</button>
+            </div>
+            <p class="section-label">图片放置区域（相对画布百分比）</p>
+            <div class="slider-row"><label>上</label><input type="range" id="padT" min="0" max="60" step="0.5"><output></output></div>
+            <div class="slider-row"><label>右</label><input type="range" id="padR" min="0" max="40" step="0.5"><output></output></div>
+            <div class="slider-row"><label>下</label><input type="range" id="padB" min="0" max="60" step="0.5"><output></output></div>
+            <div class="slider-row"><label>左</label><input type="range" id="padL" min="0" max="40" step="0.5"><output></output></div>
+            <label class="check"><input type="checkbox" id="showGuides"><span>在预览中显示放置区域参考线（不会导出）</span></label>
+          </div>
+        </div>
+
+        <p class="tip" id="noneTip" hidden>无底图：不加标题栏和四周留白，图片直接拼接排列。</p>
       </div>
     </section>
 
     <!-- 04 版式 -->
-    <section class="card">
-      <div class="card-hd">
+    <section class="card collapsible" data-card="layout">
+      <div class="card-hd" role="button" tabindex="0" aria-expanded="true">
         <span class="step">04</span>
         <h2>拼图版式</h2>
+        <span class="badge" id="layoutState">3 列</span>
+        <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5"/></svg>
       </div>
       <div class="card-bd">
         <p class="section-label">排列方向</p>
@@ -168,14 +208,7 @@
             <option value="contain">保持比例（不裁剪，留白）</option>
           </select>
         </div>
-        <div class="row" id="headerRow">
-          <label for="headerTitle">大标题</label>
-          <input type="text" id="headerTitle" placeholder="留空则使用素材名称">
-        </div>
-        <div class="row">
-          <label for="headerMeta">右上角信息</label>
-          <textarea id="headerMeta" rows="3" placeholder="每行一条，如：&#10;价格 33R / 集均 1100+P&#10;联系 638823217"></textarea>
-        </div>
+        <label class="check"><input type="checkbox" id="lastRowFill"><span>末行不满格时铺满整行（否则居中保持原大小）</span></label>
       </div>
     </section>
 
@@ -239,6 +272,7 @@
 </main>
 
 <div class="toast" id="toast"></div>
+<button class="jump-preview" id="btnJump" type="button" hidden>↑ 预览</button>
 
 <div class="modal" id="guideModal" hidden>
   <div class="modal-card">
@@ -251,8 +285,9 @@
         <li><b>选择素材</b>：点「选择文件夹」，程序会自动读取文件夹名作为水印名称，并提取文件时间。手机浏览器不支持选文件夹时，用「选择图片」多选，再手动填写素材名称。</li>
         <li><b>填写水印</b>：水印内容输入一次后会永久保存在本机浏览器，下次打开自动带出；需要更换时直接改文字，或点「清空当前页」重新输入。</li>
         <li><b>用占位符</b>：<code>{folder}</code> 素材名称、<code>{date}</code> 日期、<code>{price}</code> 价格、<code>{index}</code> 序号、<code>{count}</code> 总张数。</li>
-        <li><b>可选模板</b>：上传一张设计好的背景图（含标题栏、底栏），用「图片放置区域」的四个滑块把画面框到模板的空白处即可。</li>
-        <li><b>调整版式</b>：列数决定上下拼接还是多列网格，右侧会实时预览。</li>
+        <li><b>选底图</b>：默认「纯色底图」，可自选颜色并填写标题、右上角信息；也可上传自己设计好的底图，用「图片放置区域」框出空白处；选「无底图」则图片直接拼接。</li>
+        <li><b>调位置</b>：水印点「位置」后可切换「九宫格」（左上、右下等固定位置，再用滑条微调）或「自由定位」（横向、纵向百分比滑条，想放哪就放哪）。</li>
+        <li><b>调整版式</b>：列数决定上下拼接还是多列网格，右侧会实时预览；03、04 两张卡片点标题可以收起，收起后能看到更多内容（状态会被记住）。</li>
         <li><b>导出</b>：选择宽度与格式后保存。所有处理都在本机完成，图片不会上传。</li>
       </ol>
       <p class="tip">提示：给水印留出低透明度、贴边放置的位置，既能看清文字，也不会挡住人物主体。</p>
@@ -260,8 +295,8 @@
   </div>
 </div>
 
-<script src="assets/js/core.js?v=2"></script>
-<script src="assets/js/render.js?v=2"></script>
-<script src="assets/js/app.js?v=2"></script>
+<script src="assets/js/core.js?v=4"></script>
+<script src="assets/js/render.js?v=4"></script>
+<script src="assets/js/app.js?v=4"></script>
 </body>
 </html>
