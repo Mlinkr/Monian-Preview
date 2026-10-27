@@ -466,7 +466,8 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border:none;border-ra
     border-bottom:1px solid var(--line);
     background:#0a0a0d;
   }
-  .stage.is-empty{height:auto;min-height:0}
+  /* 移动端没有素材时不占位，直接隐藏预览区 */
+  .stage.is-empty{display:none}
   .stage-wrap{padding:10px;align-items:flex-start}
   #btnFit{display:none}
   .stage-canvas{margin:0 auto}
