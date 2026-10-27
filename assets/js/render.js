@@ -257,8 +257,7 @@
     if (!iw || !ih) return;
 
     ctx.save();
-    // 与文字水印一致：做 gamma 换算，避免低档位区间看起来几乎没变化
-    ctx.globalAlpha = Math.pow(op, 1 / 2.2);
+    ctx.globalAlpha = op;
 
     // 16:9 图片水印：等比缩放铺满整个区域（cover），与素材完全对齐
     if (it.fitCell) {
@@ -421,16 +420,13 @@
         ctx.textAlign = align;
         ctx.textBaseline = 'alphabetic';
         const op = U.clamp(ln.op, 0, 1);
-        // 感知均匀：canvas 混合在 sRGB 空间做线性插值，而人眼是近似 gamma 2.2 的，
-        // 直接 globalAlpha=op 时低档位（0.3、0.2、0.1…）看起来几乎一样，
-        // 要拖到一半以下才"突然"变淡。这里做 gamma 换算，让 0/25/50/75/100 看起来等距。
-        const ga = Math.pow(op, 1 / 2.2);
+        // 透明度就是透明度：直接用原值，保证拖动多少就变多少（线性一一对应）
         // 阴影只为「提高可读性」，必须严格跟随透明度衰减，否则等于给字加了一层不透的底
-        const shOp = 0.5 * ga * ga;
+        const shOp = 0.45 * op;
         ctx.shadowColor = `rgba(0,0,0,${shOp.toFixed(4)})`;
-        ctx.shadowBlur = Math.max(0.5, ln.fs * 0.3 * ga);
+        ctx.shadowBlur = Math.max(0.5, ln.fs * 0.3 * op);
         ctx.shadowOffsetY = Math.max(0.3, ln.fs * 0.03);
-        ctx.globalAlpha = ga;
+        ctx.globalAlpha = op;
         ctx.fillStyle = ln.color || '#ffffff';
         ctx.fillText(ln.text, x, baseline);
         ctx.globalAlpha = 1;

@@ -1,6 +1,6 @@
 {
-  "name": "莫念 Monian · 拼图预览生成器",
-  "short_name": "莫念拼图",
+  "name": "Monian · 拼图预览生成器",
+  "short_name": "Monian",
   "description": "上传文件夹，自动拼图并添加水印信息，一键生成高清预览长图。所有处理在浏览器本地完成。",
   "start_url": "./",
   "scope": "./",

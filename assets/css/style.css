@@ -1,5 +1,5 @@
 /* ===========================================================
-   莫念 Monian · 拼图预览生成器
+   Monian · 拼图预览生成器
    =========================================================== */
 
 :root{
@@ -61,8 +61,9 @@ code{
 }
 .brand{display:flex;align-items:center;gap:11px}
 .brand-txt{display:flex;flex-direction:column;line-height:1.25}
-.brand-txt strong{font-size:16px;font-weight:600;letter-spacing:.06em}
-.brand-txt span{font-size:11px;color:var(--dim-2);letter-spacing:.16em}
+.brand-txt strong{font-size:17px;font-weight:500;letter-spacing:.24em;text-transform:uppercase;
+  color:#e9e3d8;text-indent:.24em}
+.brand-txt span{font-size:10.5px;color:var(--dim-2);letter-spacing:.28em;margin-top:2px}
 .top-actions{display:flex;gap:8px}
 
 /* ---------- 布局 ---------- */

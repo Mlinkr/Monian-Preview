@@ -1,4 +1,4 @@
-# 莫念 Monian · 拼图预览生成器
+# Monian · 拼图预览生成器
 
 > 上传一个文件夹，自动拼成一张带水印的高清预览长图。纯前端、无需服务器、照片不会离开你的设备。
 
@@ -94,7 +94,7 @@ git clone https://github.com/你的用户名/monian-preview.git
 cd monian-preview
 # 把本项目文件复制进来
 git add .
-git commit -m "feat: 莫念拼图预览生成器"
+git commit -m "feat: Monian 拼图预览生成器"
 git push
 ```
 
@@ -160,4 +160,4 @@ npx serve
 
 ## License
 
-[MIT](LICENSE) © 莫念 Monian
+[MIT](LICENSE) © Monian
