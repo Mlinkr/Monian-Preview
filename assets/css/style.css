@@ -248,12 +248,13 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border:1.5px solid va
   font-size:11px;color:var(--accent);width:46px;text-align:right;flex:none;
 }
 
-/* ---------- 上传区 ---------- */
+/* ---------- 上传区（紧凑横排） ---------- */
 .dropzone{
   border:1px dashed rgba(28,25,20,.2);
   border-radius:12px;
-  padding:22px 14px 18px;
-  text-align:center;
+  padding:10px 14px;
+  display:flex;align-items:center;gap:12px;
+  text-align:left;
   cursor:pointer;
   transition:.2s;
   background:
@@ -264,12 +265,23 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border:1.5px solid va
   border-color:rgba(154,116,52,.6);
   background:radial-gradient(120% 80% at 50% 0%,rgba(154,116,52,.13),transparent 70%),#fff;
 }
-.dz-icon{width:30px;height:30px;color:var(--accent);opacity:.8;margin-bottom:8px}
-.dz-title{font-size:13px;font-weight:500;margin-bottom:3px}
-.dz-sub{font-size:11px;color:var(--dim-2);line-height:1.5;margin-bottom:14px}
-.dz-actions{display:flex;gap:8px;justify-content:center}
-.dz-actions .btn{font-size:12px;padding:7px 13px}
+.dz-icon{width:22px;height:22px;flex:none;color:var(--accent);opacity:.8}
+.dz-txt{flex:1 1 auto;min-width:0}
+.dz-title{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dz-sub{font-size:11px;color:var(--dim-2);line-height:1.4;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dz-actions{display:flex;gap:6px;flex:none;margin-left:auto}
+.dz-actions .btn{font-size:12px;padding:7px 11px;white-space:nowrap}
 .dz-actions .btn:disabled{display:none}
+@media (max-width:1120px){
+  /* 左侧栏变窄时改为两行：文字一行，按钮一行 */
+  .dropzone{flex-wrap:wrap;row-gap:8px}
+  .dz-txt{flex:1 1 calc(100% - 34px)}
+  .dz-actions{flex:1 1 100%;margin-left:0}
+  .dz-actions .btn{flex:1}
+}
+@media (max-width:560px){
+  .dz-sub{white-space:normal}
+}
 
 .progress{
   margin-top:10px;height:4px;border-radius:4px;background:rgba(28,25,20,.08);

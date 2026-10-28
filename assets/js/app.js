@@ -123,11 +123,11 @@
       el.empty.hidden = false;
       el.stageMeta.textContent = '等待素材…';
       $('#btnExport').disabled = true;
-      $('#btnCopy').disabled = true;
+      $('#btnClearStage').disabled = true;
       return;
     }
     $('#btnExport').disabled = false;
-    $('#btnCopy').disabled = false;
+    $('#btnClearStage').disabled = false;
     el.stageCanvas.hidden = false;
     el.empty.hidden = true;
 
@@ -203,8 +203,8 @@
     el.fileCount.textContent = `${state.files.length} 张`;
     el.fileCount.classList.toggle('on', state.files.length > 0);
     el.assetInfo.hidden = state.files.length === 0;
-    const clearBtn = document.getElementById('btnClearFiles');
-    if (clearBtn) clearBtn.hidden = state.files.length === 0;
+    const clearStage = document.getElementById('btnClearStage');
+    if (clearStage) clearStage.disabled = state.files.length === 0;
     if (state.files.length) {
     }
   }
@@ -219,15 +219,6 @@
     state.files.splice(i, 1);
     renderThumbs();
     commit();
-  });
-
-  // 一键清空全部素材
-  document.getElementById('btnClearFiles').addEventListener('click', () => {
-    state.files.forEach((f) => f.thumbUrl && URL.revokeObjectURL(f.thumbUrl));
-    state.files = [];
-    renderThumbs();
-    commit(true);
-    MN.toast('已清空全部素材');
   });
 
   /* ---------------- 文件读取 ---------------- */
@@ -1403,17 +1394,13 @@
   $('#btnExport').addEventListener('click', exportImage);
   $('#btnExport2').addEventListener('click', exportImage);
 
-  $('#btnCopy').addEventListener('click', async () => {
-    if (!state.files.length) { MN.toast('请先添加素材'); return; }
-    try {
-      if (!navigator.clipboard || !window.ClipboardItem) throw new Error('unsupported');
-      const { canvas } = await buildCanvas(state.export.width);
-      const blob = await toBlob(canvas, 'image/png');
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      MN.toast('已复制到剪贴板');
-    } catch (e) {
-      MN.toast('当前浏览器不支持复制，请用「导出图片」', 2800);
-    }
+  $('#btnClearStage').addEventListener('click', () => {
+    if (!state.files.length) return;
+    state.files.forEach((f) => f.thumbUrl && URL.revokeObjectURL(f.thumbUrl));
+    state.files = [];
+    renderThumbs();
+    commit(true);
+    MN.toast('已清空全部素材');
   });
 
   /* ---------------- 重置 / 说明 ---------------- */

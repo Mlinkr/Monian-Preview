@@ -51,8 +51,10 @@
             <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l1.6 2H19.5A1.5 1.5 0 0 1 21 9.5v9A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5z"/>
             <path d="M12 17v-5M9.5 14.2 12 11.7l2.5 2.5"/>
           </svg>
-          <p class="dz-title">拖入文件夹，或点击选择</p>
-          <p class="dz-sub">文件夹名会自动提取为水印信息 · 支持 JPG / PNG / WebP</p>
+          <div class="dz-txt">
+            <p class="dz-title">拖入文件夹，或点击选择</p>
+            <p class="dz-sub">文件夹名自动提取为水印 · JPG / PNG / WebP</p>
+          </div>
           <div class="dz-actions">
             <button class="btn btn-primary" id="btnFolder" type="button">选择文件夹</button>
             <button class="btn btn-ghost" id="btnFiles" type="button">选择图片</button>
@@ -69,7 +71,6 @@
         </div>
 
         <div class="thumbs" id="thumbs"></div>
-        <button class="btn btn-ghost full" id="btnClearFiles" type="button" hidden>🗑 一键清空全部素材</button>
       </div>
     </section>
 
@@ -315,7 +316,7 @@
       <div class="stage-meta" id="stageMeta">等待素材…</div>
       <div class="stage-actions">
         <button class="btn btn-ghost btn-sm" id="btnFit" type="button">铺满</button>
-        <button class="btn btn-ghost btn-sm" id="btnCopy" type="button">复制</button>
+        <button class="btn btn-ghost btn-sm danger" id="btnClearStage" type="button" disabled>清空素材</button>
         <button class="btn btn-primary" id="btnExport" type="button" disabled>导出图片</button>
       </div>
     </div>
