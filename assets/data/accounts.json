@@ -8,6 +8,12 @@
       "p": "5ac158956c6b68a1bb5b8b9ffcd04d9064cfe56d490340a1e9798832635caf01",
       "note": "Admin",
       "expire": ""
+    },
+    {
+      "u": "Test",
+      "p": "4265faa07ab7085a49e83c81e164cbf4c2a982d039d2386be3d173b3a20f3f52",
+      "note": "测试号",
+      "expire": "2026-11-04"
     }
   ]
 }
