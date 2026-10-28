@@ -78,7 +78,7 @@
     .mbody .mr .k{color:var(--sub);font-size:12px;flex-shrink:0;}
     .mbody .mr .bad{color:#b4433a;}
     .mbody .macts{display:flex;flex-wrap:wrap;gap:8px;padding-top:8px;}
-    .mbody .mini{font-size:12px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:6px 10px;text-decoration:none;color:var(--accent);}
+    .mbody .mini{flex:1 1 0;min-width:calc(33.33% - 6px);font-size:13px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 6px;text-decoration:none;color:var(--accent);text-align:center;}
     .mbody .mini.del{color:#b4433a;}
     .frow input,.frow select{flex:1 1 100%;}
   }
@@ -457,7 +457,9 @@
     $('#q').addEventListener('input', () => { state.q = $('#q').value; state.page = 1; render(); });
     $('#pgPrev').addEventListener('click', () => { state.page--; render(); });
     $('#pgNext').addEventListener('click', () => { state.page++; render(); });
-    $('#mList').addEventListener('click', (e) => {
+    $('#mList').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.mini');
+      if (btn) { await doAction(btn); return; }
       const head = e.target.closest('.mhead');
       if (!head) return;
       const u = head.dataset.u;
@@ -572,34 +574,6 @@
     });
 
     /* ---------- 设备面板 ---------- */
-    const DEV_WARN = 3;   // 设备数超过这个值标红（可自行调整）
-    async function openDevDlg(account) {
-      $('#devName').textContent = account;
-      $('#devList').innerHTML = '正在读取…';
-      show('#devDlg', true);
-      try {
-        // 公开仓库 raw 直读，绕过 CDN 缓存拿最新
-        const r = await fetch('https://raw.githubusercontent.com/Mlinkr/Log/main/Monian-devices.json?t=' + Date.now(), { cache: 'no-store' });
-        if (r.status === 404) { $('#devList').innerHTML = '暂无登录记录（还没有用户登录过）'; return; }
-        if (!r.ok) throw new Error('读取失败 ' + r.status);
-        const data = await r.json();
-        const acc = (data.users || {})[account] || {};
-        const dids = Object.keys(acc);
-        if (!dids.length) { $('#devList').innerHTML = '暂无登录记录'; return; }
-        const list = dids.map((did) => ({ did, ...acc[did] }))
-          .sort((a, b) => String(b.last).localeCompare(String(a.last)));
-        const warn = dids.length > DEV_WARN
-          ? `<div class="devwarn">⚠ 该账号已有 ${dids.length} 台设备登录，有分享嫌疑，建议改密或删除账号</div>` : '';
-        $('#devList').innerHTML = warn + list.map((d) => `
-          <div class="devrow">
-            <div class="dv1"><span>${d.dev || '未知设备'}</span>
-              <span class="cnt ${dids.length > DEV_WARN ? 'hot' : ''}">${d.count} 次</span></div>
-            <div class="dv2">屏幕 ${d.screen || '—'} · 首次 ${d.first || '—'} · 最近 ${d.last || '—'}</div>
-          </div>`).join('');
-      } catch (e) {
-        $('#devList').innerHTML = '读取失败：' + e.message + '（GitHub 访问波动，稍后再试）';
-      }
-    }
     $('#dlgOk').addEventListener('click', () => {
       if (expTarget >= 0 && state.data.users[expTarget]) {
         state.data.users[expTarget].expire = dlgExpire();
@@ -611,23 +585,59 @@
     $('#tbody').addEventListener('click', async (e) => {
       const b = e.target.closest('.mini');
       if (!b) return;
-      const i = +b.dataset.i;
-      const u = state.data.users[i];
-      const act = b.dataset.act;
-      if (act === 'del') {
-        if (confirm('删除账号 ' + u.u + '？')) { state.data.users.splice(i, 1); render(); }
-      } else if (act === 'pwd') {
-        const np = prompt('为 ' + u.u + ' 设置新密码：');
-        if (np) { u.p = await sha(`${u.u}:${np}`); render(); }
-      } else if (act === 'exp') {
-        openExpDlg(i);
-      } else if (act === 'dev') {
-        openDevDlg(u.u);
-      } else if (act === 'note') {
-        const nn = prompt('备注：', u.note || '');
-        if (nn != null) { u.note = nn; render(); }
-      }
+      await doAction(b);
     });
+  }
+
+  /* 设备面板（PC 表格与移动卡片共用） */
+  const DEV_WARN = 3;   // 设备数超过这个值标红（可自行调整）
+  async function openDevDlg(account) {
+    $('#devName').textContent = account;
+    $('#devList').innerHTML = '正在读取…';
+    show('#devDlg', true);
+    try {
+      // 公开仓库 raw 直读，绕过 CDN 缓存拿最新
+      const r = await fetch('https://raw.githubusercontent.com/Mlinkr/Log/main/Monian-devices.json?t=' + Date.now(), { cache: 'no-store' });
+      if (r.status === 404) { $('#devList').innerHTML = '暂无登录记录（还没有用户登录过）'; return; }
+      if (!r.ok) throw new Error('读取失败 ' + r.status);
+      const data = await r.json();
+      const acc = (data.users || {})[account] || {};
+      const dids = Object.keys(acc);
+      if (!dids.length) { $('#devList').innerHTML = '暂无登录记录'; return; }
+      const list = dids.map((did) => ({ did, ...acc[did] }))
+        .sort((a, b) => String(b.last).localeCompare(String(a.last)));
+      const warn = dids.length > DEV_WARN
+        ? `<div class="devwarn">⚠ 该账号已有 ${dids.length} 台设备登录，有分享嫌疑，建议改密或删除账号</div>` : '';
+      $('#devList').innerHTML = warn + list.map((d) => `
+        <div class="devrow">
+          <div class="dv1"><span>${d.dev || '未知设备'}</span>
+            <span class="cnt ${dids.length > DEV_WARN ? 'hot' : ''}">${d.count} 次</span></div>
+          <div class="dv2">屏幕 ${d.screen || '—'} · 首次 ${d.first || '—'} · 最近 ${d.last || '—'}</div>
+        </div>`).join('');
+    } catch (e) {
+      $('#devList').innerHTML = '读取失败：' + e.message + '（GitHub 访问波动，稍后再试）';
+    }
+  }
+
+  /* 账号操作（PC 表格与移动卡片共用） */
+  async function doAction(b) {
+    const i = +b.dataset.i;
+    const u = (state.data.users || [])[i];
+    if (!u) return;
+    const act = b.dataset.act;
+    if (act === 'del') {
+      if (confirm('删除账号 ' + u.u + '？')) { state.data.users.splice(i, 1); render(); }
+    } else if (act === 'pwd') {
+      const np = prompt('为 ' + u.u + ' 设置新密码：');
+      if (np) { u.p = await sha(`${u.u}:${np}`); render(); }
+    } else if (act === 'exp') {
+      openExpDlg(i);
+    } else if (act === 'dev') {
+      openDevDlg(u.u);
+    } else if (act === 'note') {
+      const nn = prompt('备注：', u.note || '');
+      if (nn != null) { u.note = nn; render(); }
+    }
   }
 
   (async function boot() {
