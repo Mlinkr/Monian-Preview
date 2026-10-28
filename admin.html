@@ -43,20 +43,39 @@
   #expDlg .box{background:#fff;border-radius:14px;padding:22px;width:min(340px,92vw);box-shadow:0 16px 44px rgba(29,26,21,.2);}
   #expDlg h3{margin:0 0 14px;font-size:15px;}
   #expDlg .frow{margin-bottom:12px;}
-  /* 移动端：表格变卡片 */
+  /* 移动端：表格变折叠卡片 */
   @media (max-width:640px){
     .wrap{padding:24px 12px 48px;}
     .card{padding:18px 14px;}
-    table,thead,tbody,tr,td,th{display:block;width:100%;}
-    thead{display:none;}
-    tr{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:#fcfbf8;}
-    td{border:none;padding:4px 0;display:flex;justify-content:space-between;align-items:center;gap:10px;}
-    td::before{content:attr(data-l);color:var(--sub);font-size:12px;flex-shrink:0;}
-    td.td-actions{flex-wrap:wrap;justify-content:flex-start;}
-    td.td-actions::before{content:'操作';margin-right:4px;}
-    td.td-actions .mini{margin:2px 8px 2px 0;}
+    #listTable thead{display:none;}
+    #listTable,#listTable tbody{display:block;width:100%;}
+    #listTable{display:none;}               /* 移动端用卡片，不用表格 */
+    #mList{display:block;}
+    .mcard{border:1px solid var(--line);border-radius:10px;margin-bottom:10px;background:#fcfbf8;overflow:hidden;}
+    .mhead{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;cursor:pointer;gap:10px;}
+    .mhead .mu{font-weight:600;font-size:14px;}
+    .mhead .ms{font-size:12px;color:var(--sub);}
+    .mhead .ms.bad{color:#b4433a;}
+    .mhead .arrow{color:var(--sub);font-size:12px;transition:transform .15s;}
+    .mcard.open .arrow{transform:rotate(180deg);}
+    .mbody{display:none;border-top:1px dashed var(--line);padding:10px 14px 12px;}
+    .mcard.open .mbody{display:block;}
+    .mbody .mr{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;gap:10px;}
+    .mbody .mr .k{color:var(--sub);font-size:12px;flex-shrink:0;}
+    .mbody .mr .bad{color:#b4433a;}
+    .mbody .macts{display:flex;flex-wrap:wrap;gap:8px;padding-top:8px;}
+    .mbody .mini{font-size:12px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:6px 10px;text-decoration:none;color:var(--accent);}
+    .mbody .mini.del{color:#b4433a;}
     .frow input,.frow select{flex:1 1 100%;}
   }
+  @media (min-width:641px){
+    #mList{display:none;}                   /* PC 用表格 */
+  }
+  .pager{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:12px;color:var(--sub);}
+  .pager button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:6px 12px;cursor:pointer;color:var(--ink);font-size:12px;}
+  .pager button:disabled{opacity:.4;cursor:default;}
+  .search-row{display:flex;gap:10px;margin-bottom:12px;}
+  .search-row input{flex:1;}
 </style>
 </head>
 <body>
@@ -93,10 +112,19 @@
   <div class="hide" id="mgr">
     <div class="card">
       <h2>账号列表</h2>
-      <table>
+      <div class="search-row">
+        <input id="q" placeholder="搜索账号或备注…">
+      </div>
+      <table id="listTable">
         <thead><tr><th>账号</th><th>备注</th><th>有效期</th><th>到期日</th><th>操作</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
+      <div id="mList"></div>
+      <div class="pager">
+        <button id="pgPrev">上一页</button>
+        <span id="pgInfo"></span>
+        <button id="pgNext">下一页</button>
+      </div>
       <p class="hint" id="count" style="margin:10px 0 0"></p>
     </div>
     <div class="card">
@@ -162,7 +190,8 @@
   const API = 'https://api.github.com';
   const $ = (s) => document.querySelector(s);
 
-  const state = { data: null, adminHash: null, pat: '' };
+  const state = { data: null, adminHash: null, pat: '', q: '', page: 1, expanded: new Set() };
+  const PAGE_SIZE = 10;
 
   async function sha(text) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -248,25 +277,66 @@
   }
 
   /* ---------- 渲染 ---------- */
+  function filteredUsers() {
+    const q = state.q.trim().toLowerCase();
+    const list = state.data.users || [];
+    if (!q) return list;
+    return list.filter((u) =>
+      String(u.u || '').toLowerCase().includes(q) || String(u.note || '').toLowerCase().includes(q));
+  }
+  function actButtons(i) {
+    return `<button class="mini" data-act="pwd" data-i="${i}">改密</button>
+      <button class="mini" data-act="exp" data-i="${i}">改期</button>
+      <button class="mini" data-act="note" data-i="${i}">改备注</button>
+      <button class="mini del" data-act="del" data-i="${i}">删除</button>`;
+  }
   function render() {
-    const tb = $('#tbody'); tb.innerHTML = '';
+    const all = filteredUsers();
+    const totalPages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
+    state.page = Math.min(Math.max(1, state.page), totalPages);
+    const page = all.slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE);
     const today = todayStr();
-    (state.data.users || []).forEach((u, i) => {
-      const tr = document.createElement('tr');
+    // data-i 用全量索引，保证增删后操作仍指向正确的账号
+    const gIdx = (u) => (state.data.users || []).indexOf(u);
+
+    const tb = $('#tbody'); tb.innerHTML = '';
+    page.forEach((u) => {
+      const i = gIdx(u);
       const old = u.expire && u.expire < today;
+      const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td data-l="账号">${u.u}</td>
-        <td data-l="备注">${u.note || '—'}</td>
-        <td data-l="有效期" class="${old ? 'exp-old' : ''}">${expLabel(u)}${old ? '' : ''}</td>
-        <td data-l="到期日" class="${old ? 'exp-old' : ''}">${u.expire || '永久'}${old ? '（已过期）' : ''}</td>
-        <td class="td-actions">
-          <button class="mini" data-act="pwd" data-i="${i}">改密</button>
-          <button class="mini" data-act="exp" data-i="${i}">改期</button>
-          <button class="mini" data-act="note" data-i="${i}">改备注</button>
-          <button class="mini del" data-act="del" data-i="${i}">删除</button>
-        </td>`;
+        <td>${u.u}</td>
+        <td>${u.note || '—'}</td>
+        <td class="${old ? 'exp-old' : ''}">${expLabel(u)}</td>
+        <td class="${old ? 'exp-old' : ''}">${u.expire || '永久'}${old ? '（已过期）' : ''}</td>
+        <td class="td-actions">${actButtons(i)}</td>`;
       tb.appendChild(tr);
     });
+
+    const ml = $('#mList'); ml.innerHTML = '';
+    page.forEach((u) => {
+      const i = gIdx(u);
+      const old = u.expire && u.expire < today;
+      const card = document.createElement('div');
+      card.className = 'mcard' + (state.expanded.has(u.u) ? ' open' : '');
+      card.innerHTML = `
+        <div class="mhead" data-u="${u.u}">
+          <span class="mu">${u.u}</span>
+          <span class="ms ${old ? 'bad' : ''}">${expLabel(u)}</span>
+          <span class="arrow">▾</span>
+        </div>
+        <div class="mbody">
+          <div class="mr"><span class="k">备注</span><span>${u.note || '—'}</span></div>
+          <div class="mr"><span class="k">有效期</span><span class="${old ? 'bad' : ''}">${expLabel(u)}</span></div>
+          <div class="mr"><span class="k">到期日</span><span class="${old ? 'bad' : ''}">${u.expire || '永久'}${old ? '（已过期）' : ''}</span></div>
+          <div class="macts">${actButtons(i)}</div>
+        </div>`;
+      ml.appendChild(card);
+    });
+
+    $('#pgInfo').textContent = all.length ? `第 ${state.page} / ${totalPages} 页 · 共 ${all.length} 条` : '无匹配账号';
+    $('#pgPrev').disabled = state.page <= 1;
+    $('#pgNext').disabled = state.page >= totalPages;
     $('#count').textContent = `共 ${(state.data.users || []).length} 个账号（改动后需点「推送到 GitHub」）`;
   }
   function show(id, on) { $(id).classList.toggle('hide', !on); }
@@ -336,6 +406,16 @@
     $('#patBtn').addEventListener('click', patStep);
     $('#pat').addEventListener('keydown', (e) => { if (e.key === 'Enter') patStep(); });
     $('#pushBtn').addEventListener('click', push);
+    $('#q').addEventListener('input', () => { state.q = $('#q').value; state.page = 1; render(); });
+    $('#pgPrev').addEventListener('click', () => { state.page--; render(); });
+    $('#pgNext').addEventListener('click', () => { state.page++; render(); });
+    $('#mList').addEventListener('click', (e) => {
+      const head = e.target.closest('.mhead');
+      if (!head) return;
+      const u = head.dataset.u;
+      if (state.expanded.has(u)) state.expanded.delete(u); else state.expanded.add(u);
+      head.parentElement.classList.toggle('open');
+    });
     $('#reloadBtn').addEventListener('click', async () => {
       state.data = await loadAccounts(); render();
       $('#pushMsg').className = 'msg ok'; $('#pushMsg').textContent = '已重新读取';

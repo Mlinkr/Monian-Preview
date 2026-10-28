@@ -55,13 +55,21 @@
         #authGate input{width:100%;box-sizing:border-box;border:1px solid #ddd6ca;border-radius:8px;
           padding:11px 12px;font-size:14px;margin-bottom:12px;background:#faf9f6;color:#1d1a15;}
         #authGate input:focus{outline:none;border-color:#9a7434;}
+        #authGate input[type=checkbox]{width:15px;height:15px;flex:0 0 15px;margin:0;padding:0;
+          accent-color:#9a7434;border-radius:3px;}
         #authGate button{width:100%;border:none;border-radius:8px;padding:12px;font-size:15px;
           background:#9a7434;color:#fff;cursor:pointer;letter-spacing:.2em;}
         #authGate button:active{opacity:.85;}
-        #authGate .row{display:flex;align-items:center;justify-content:flex-start;gap:6px;
+        #authGate .row{display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;
           font-size:12px;color:#8b8275;margin:2px 0 14px;}
         #authGate .msg{min-height:18px;font-size:12px;color:#b4433a;margin-top:10px;}
         #authGate .tip{font-size:11px;color:#b5ac9d;margin-top:14px;}
+        @media (max-width:640px){
+          /* 16px 以上可避免 iOS 聚焦时自动放大页面 */
+          #authGate input{font-size:16px;padding:12px;}
+          #authGate .card{padding:30px 24px 24px;}
+          #authGate h1{font-size:20px;}
+        }
         #authGate .out{position:fixed;right:16px;bottom:14px;font-size:12px;color:#9a9184;
           text-decoration:underline;cursor:pointer;background:none;border:none;}
       </style>
@@ -70,7 +78,7 @@
         <div class="sub">预 览 生 成 器</div>
         <input id="au" type="text" placeholder="账号" autocomplete="username">
         <input id="ap" type="password" placeholder="密码" autocomplete="current-password">
-        <label class="row"><input type="checkbox" id="ar" style="width:auto;margin:0"> 30 天内免登录</label>
+        <label class="row"><input type="checkbox" id="ar"> 30 天内免登录</label>
         <button id="ab">进 入</button>
         <div class="msg" id="am"></div>
         <div class="tip">账号请联系管理员获取 · 所有图片仅在本机处理</div>
