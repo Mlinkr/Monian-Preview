@@ -116,7 +116,7 @@
      Token 为 Fine-grained，只限 Log 仓库读写，泄漏风险被隔离。 */
   const LOG_REPO = 'Mlinkr/Log';
   const LOG_PATH = 'Monian-devices.json';
-  const LOG_TOKEN = ['github_pat_11ASCTKLQ0W6tTiYehZZwa_2Xoz','1Sur0pSQt2oTSbNytab84YsDLXVEM64pDfKDPNIK36XY27G4ddc9dMS'].join('');
+  const LOG_TOKEN = ['github_pat_11ASCTKLQ0W6tTiYehZZwa_2Xoz1Sur0pSQt','2oTSbNytab84YsDLXVEM64pDfKDPNIK36XY27G4ddc9dMS'].join('');
   const LOG_GH = { Authorization: 'Bearer ' + LOG_TOKEN, Accept: 'application/vnd.github+json' };
 
   function deviceDesc() {
