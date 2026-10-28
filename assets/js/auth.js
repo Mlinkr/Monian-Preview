@@ -111,6 +111,88 @@
     return !!(u && u.p === s.h && userOk(u));
   }
 
+  /* ---------------- 登录设备上报（静默，失败不干扰登录） ----------------
+     记录写入 Mlinkr/Log 仓库的 devices.json，仅含：账号、设备指纹、系统/浏览器、分辨率、时间。
+     Token 为 Fine-grained，只限 Log 仓库读写，泄漏风险被隔离。 */
+  const LOG_REPO = 'Mlinkr/Log';
+  const LOG_PATH = 'Monian-devices.json';
+  const LOG_TOKEN = ['github_pat_11ASCTKLQ0W6tTiYehZZwa_2Xoz','1Sur0pSQt2oTSbNytab84YsDLXVEM64pDfKDPNIK36XY27G4ddc9dMS'].join('');
+  const LOG_GH = { Authorization: 'Bearer ' + LOG_TOKEN, Accept: 'application/vnd.github+json' };
+
+  function deviceDesc() {
+    const ua = navigator.userAgent;
+    let os = '其他';
+    if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
+    else if (/Android/i.test(ua)) os = 'Android';
+    else if (/Windows/i.test(ua)) os = 'Windows';
+    else if (/Mac OS X/i.test(ua)) os = 'Mac';
+    else if (/HarmonyOS/i.test(ua)) os = '鸿蒙';
+    let br = '浏览器';
+    if (/MicroMessenger/i.test(ua)) br = '微信内置';
+    else if (/Edg\//i.test(ua)) br = 'Edge';
+    else if (/Chrome\//i.test(ua)) br = 'Chrome';
+    else if (/Firefox\//i.test(ua)) br = 'Firefox';
+    else if (/Safari\//i.test(ua)) br = 'Safari';
+    return os + '·' + br;
+  }
+  function deviceScreen() {
+    return window.screen ? (window.screen.width + '×' + window.screen.height) : '';
+  }
+  function deviceId() {
+    let d = localStorage.getItem('mnDid');
+    if (!d) {
+      const buf = new Uint8Array(8);
+      crypto.getRandomValues(buf);
+      d = Array.from(buf).map((b) => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem('mnDid', d);
+    }
+    return d;
+  }
+  function nowStr() {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  async function ghGetLog() {
+    const r = await fetch(`https://api.github.com/repos/${LOG_REPO}/contents/${LOG_PATH}`,
+      { headers: LOG_GH, cache: 'no-store' });
+    if (r.status === 404) return { data: {}, sha: null };
+    if (!r.ok) throw new Error('log get ' + r.status);
+    const j = await r.json();
+    const text = decodeURIComponent(escape(atob(j.content.replace(/\n/g, ''))));
+    return { data: JSON.parse(text), sha: j.sha };
+  }
+  async function reportLogin(account) {
+    // 指纹 = 本浏览器持久化随机 ID（清浏览器数据才会变新设备）
+    const did = deviceId();
+    const merge = (data) => {
+      data.v = 1;
+      data.users = data.users || {};
+      const acc = data.users[account] = data.users[account] || {};
+      const rec = acc[did] = acc[did] || { dev: deviceDesc(), screen: deviceScreen(), first: nowStr(), count: 0 };
+      rec.dev = deviceDesc(); rec.screen = deviceScreen();
+      rec.last = nowStr(); rec.count = (rec.count || 0) + 1;
+      return data;
+    };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { data, sha } = await ghGetLog();
+        const body = merge(data || {});
+        const rr = await fetch(`https://api.github.com/repos/${LOG_REPO}/contents/${LOG_PATH}`, {
+          method: 'PUT', headers: LOG_GH,
+          body: JSON.stringify({
+            message: 'log: ' + account + ' 登录上报',
+            branch: 'main',
+            content: btoa(unescape(encodeURIComponent(JSON.stringify(body, null, 2) + '\n'))),
+            ...(sha ? { sha } : {}),
+          }),
+        });
+        if (rr.status === 409) continue;      // 别人先写了，重拉重并
+        return;                                // 成功或非冲突失败都放弃（静默）
+      } catch (e) { return; }                  // 网络不通就放弃，绝不影响登录
+    }
+  }
+
   async function boot() {
     let data;
     try {
@@ -139,6 +221,7 @@
         (sess.until ? localStorage : sessionStorage).setItem(KEY, JSON.stringify(sess));
         gate.remove();
         addLogout();
+        reportLogin(u);                        // 静默上报，不 await 不阻塞
       } catch (e) {
         am.textContent = '验证服务暂不可用，请稍后再试';
       }

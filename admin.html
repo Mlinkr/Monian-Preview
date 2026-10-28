@@ -40,6 +40,14 @@
   /* 改期小面板 */
   #expDlg{position:fixed;inset:0;z-index:50;background:rgba(29,26,21,.35);display:flex;align-items:center;justify-content:center;padding:16px;}
   #expDlg.hide{display:none;}
+  #devDlg{position:fixed;inset:0;z-index:50;background:rgba(29,26,21,.35);display:flex;align-items:center;justify-content:center;padding:16px;}
+  #devDlg.hide{display:none;}
+  .devrow{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fcfbf8;}
+  .devrow .dv1{font-weight:600;font-size:13px;display:flex;justify-content:space-between;}
+  .devrow .dv1 .cnt{color:var(--sub);font-weight:400;}
+  .devrow .cnt.hot{color:#b4433a;}
+  .devrow .dv2{font-size:12px;color:var(--sub);margin-top:3px;}
+  .devwarn{color:#b4433a;font-size:12px;margin:4px 0 8px;}
   #expDlg .box{background:#fff;border-radius:14px;padding:22px;width:min(340px,92vw);box-shadow:0 16px 44px rgba(29,26,21,.2);}
   #expDlg h3{margin:0 0 14px;font-size:15px;}
   #expDlg .frow{margin-bottom:12px;}
@@ -156,6 +164,17 @@
       <div class="msg" id="pushMsg"></div>
     </div>
     <p class="hint" style="text-align:center">改动需点击「推送到 GitHub」才会生效；推送成功后约 1 分钟线上更新。</p>
+  </div>
+</div>
+
+<!-- 设备面板 -->
+<div id="devDlg" class="hide">
+  <div class="box" style="width:min(420px,94vw)">
+    <h3>登录设备 · <span id="devName"></span></h3>
+    <div id="devList" class="hint" style="max-height:50vh;overflow:auto"></div>
+    <div class="frow" style="margin-top:16px;justify-content:flex-end">
+      <button class="b" id="devClose">关闭</button>
+    </div>
   </div>
 </div>
 
@@ -287,6 +306,7 @@
   function actButtons(i) {
     return `<button class="mini" data-act="pwd" data-i="${i}">改密</button>
       <button class="mini" data-act="exp" data-i="${i}">改期</button>
+      <button class="mini" data-act="dev" data-i="${i}">设备</button>
       <button class="mini" data-act="note" data-i="${i}">改备注</button>
       <button class="mini del" data-act="del" data-i="${i}">删除</button>`;
   }
@@ -462,6 +482,37 @@
     });
     $('#dlgDays').addEventListener('input', syncDlgPrev);
     $('#dlgCancel').addEventListener('click', () => show('#expDlg', false));
+    $('#devClose').addEventListener('click', () => show('#devDlg', false));
+
+    /* ---------- 设备面板 ---------- */
+    const DEV_WARN = 3;   // 设备数超过这个值标红（可自行调整）
+    async function openDevDlg(account) {
+      $('#devName').textContent = account;
+      $('#devList').innerHTML = '正在读取…';
+      show('#devDlg', true);
+      try {
+        // 公开仓库 raw 直读，绕过 CDN 缓存拿最新
+        const r = await fetch('https://raw.githubusercontent.com/Mlinkr/Log/main/Monian-devices.json?t=' + Date.now(), { cache: 'no-store' });
+        if (r.status === 404) { $('#devList').innerHTML = '暂无登录记录（还没有用户登录过）'; return; }
+        if (!r.ok) throw new Error('读取失败 ' + r.status);
+        const data = await r.json();
+        const acc = (data.users || {})[account] || {};
+        const dids = Object.keys(acc);
+        if (!dids.length) { $('#devList').innerHTML = '暂无登录记录'; return; }
+        const list = dids.map((did) => ({ did, ...acc[did] }))
+          .sort((a, b) => String(b.last).localeCompare(String(a.last)));
+        const warn = dids.length > DEV_WARN
+          ? `<div class="devwarn">⚠ 该账号已有 ${dids.length} 台设备登录，有分享嫌疑，建议改密或删除账号</div>` : '';
+        $('#devList').innerHTML = warn + list.map((d) => `
+          <div class="devrow">
+            <div class="dv1"><span>${d.dev || '未知设备'}</span>
+              <span class="cnt ${dids.length > DEV_WARN ? 'hot' : ''}">${d.count} 次</span></div>
+            <div class="dv2">屏幕 ${d.screen || '—'} · 首次 ${d.first || '—'} · 最近 ${d.last || '—'}</div>
+          </div>`).join('');
+      } catch (e) {
+        $('#devList').innerHTML = '读取失败：' + e.message + '（GitHub 访问波动，稍后再试）';
+      }
+    }
     $('#dlgOk').addEventListener('click', () => {
       if (expTarget >= 0 && state.data.users[expTarget]) {
         state.data.users[expTarget].expire = dlgExpire();
@@ -483,6 +534,8 @@
         if (np) { u.p = await sha(`${u.u}:${np}`); render(); }
       } else if (act === 'exp') {
         openExpDlg(i);
+      } else if (act === 'dev') {
+        openDevDlg(u.u);
       } else if (act === 'note') {
         const nn = prompt('备注：', u.note || '');
         if (nn != null) { u.note = nn; render(); }
