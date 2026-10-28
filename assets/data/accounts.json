@@ -1,4 +1,11 @@
 {
   "admin": null,
-  "users": []
+  "users": [
+    {
+      "u": "Monian",
+      "p": "5ac158956c6b68a1bb5b8b9ffcd04d9064cfe56d490340a1e9798832635caf01",
+      "note": "Admin",
+      "expire": ""
+    }
+  ]
 }
