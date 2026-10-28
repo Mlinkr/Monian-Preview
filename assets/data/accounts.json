@@ -1,13 +1,4 @@
 {
-  "admin": {
-    "p": "19c5ae4bfd26111da75325c3dc01ba501483d53933d04e93d419a95826a2de64"
-  },
-  "users": [
-    {
-      "u": "monian",
-      "p": "9f3128191fc349bc7c55ec6dcea47045ce84b70b6086bd345e709040cfe2f9b4",
-      "note": "Admin",
-      "expire": "2026-12-31"
-    }
-  ]
+  "admin": null,
+  "users": []
 }
