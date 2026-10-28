@@ -1,5 +1,7 @@
 {
-  "admin": null,
+  "admin": {
+    "p": "19c5ae4bfd26111da75325c3dc01ba501483d53933d04e93d419a95826a2de64"
+  },
   "users": [
     {
       "u": "Monian",
