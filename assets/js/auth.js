@@ -47,31 +47,45 @@
     el.innerHTML = `
       <style>
         #authGate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
-          background:linear-gradient(160deg,#f4f2ee 0%,#ece8df 100%);}
-        #authGate .card{width:min(360px,88vw);background:#fff;border-radius:14px;padding:34px 30px 26px;
-          box-shadow:0 18px 50px rgba(29,26,21,.14);text-align:center;}
-        #authGate h1{font-size:22px;letter-spacing:.35em;margin:0 0 4px;color:#1d1a15;font-weight:600;}
-        #authGate .sub{font-size:12px;color:#9a9184;letter-spacing:.2em;margin-bottom:24px;}
-        #authGate input{width:100%;box-sizing:border-box;border:1px solid #ddd6ca;border-radius:8px;
-          padding:11px 12px;font-size:14px;margin-bottom:12px;background:#faf9f6;color:#1d1a15;}
-        #authGate input:focus{outline:none;border-color:#9a7434;}
+          background:
+            radial-gradient(60% 40% at 22% 16%,rgba(255,255,255,.9),transparent 62%),
+            radial-gradient(55% 38% at 78% 84%,rgba(178,212,227,.55),transparent 68%),
+            linear-gradient(158deg,#f3f8fa 0%,#e6f0f5 52%,#eaf2f6 100%);}
+        #authGate::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.45;
+          background:repeating-linear-gradient(104deg,rgba(255,255,255,0) 0px,rgba(255,255,255,0) 30px,
+            rgba(255,255,255,.55) 31px,rgba(255,255,255,0) 33px,rgba(255,255,255,0) 68px,
+            rgba(208,232,242,.3) 69px,rgba(255,255,255,0) 72px);}
+        #authGate .card{position:relative;width:min(360px,88vw);background:rgba(255,255,255,.9);
+          backdrop-filter:blur(12px);border:1px solid rgba(60,88,104,.09);
+          border-radius:18px;padding:34px 30px 26px;
+          box-shadow:0 2px 6px rgba(45,72,86,.05),0 24px 60px rgba(45,72,86,.14);text-align:center;}
+        #authGate h1{font-size:22px;letter-spacing:.35em;margin:0 0 4px;color:#16303c;font-weight:600;}
+        #authGate .sub{font-size:12px;color:#8ba0ad;letter-spacing:.2em;margin-bottom:24px;}
+        #authGate input{width:100%;box-sizing:border-box;border:1px solid rgba(60,88,104,.2);border-radius:10px;
+          padding:11px 12px;font-size:14px;margin-bottom:12px;background:rgba(255,255,255,.92);color:#1d2e37;
+          transition:.18s;}
+        #authGate input:focus{outline:none;border-color:rgba(51,127,150,.6);box-shadow:0 0 0 3px rgba(51,127,150,.12);}
         #authGate input[type=checkbox]{width:15px;height:15px;flex:0 0 15px;margin:0;padding:0;
-          accent-color:#9a7434;border-radius:3px;}
-        #authGate button{width:100%;border:none;border-radius:8px;padding:12px;font-size:15px;
-          background:#9a7434;color:#fff;cursor:pointer;letter-spacing:.2em;}
-        #authGate button:active{opacity:.85;}
+          accent-color:#337f96;border-radius:3px;}
+        #authGate button{width:100%;border:none;border-radius:10px;padding:12px;font-size:15px;
+          background:linear-gradient(168deg,#3d8da4 0%,#2b6f85 55%,#235c70 100%);color:#f4fbfd;cursor:pointer;
+          letter-spacing:.2em;font-weight:600;
+          box-shadow:0 2px 10px rgba(43,111,133,.28),inset 0 1px 0 rgba(255,255,255,.18);transition:.18s;}
+        #authGate button:hover{background:linear-gradient(168deg,#4a9cb3 0%,#337f96 55%,#296b82 100%);}
+        #authGate button:active{opacity:.86;}
         #authGate .row{display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;
-          font-size:12px;color:#8b8275;margin:2px 0 14px;}
-        #authGate .msg{min-height:18px;font-size:12px;color:#b4433a;margin-top:10px;}
-        #authGate .tip{font-size:11px;color:#b5ac9d;margin-top:14px;}
+          font-size:12px;color:#5c7280;margin:2px 0 14px;}
+        #authGate .msg{min-height:18px;font-size:12px;color:#c0574f;margin-top:10px;}
+        #authGate .tip{font-size:11px;color:#a9bcc6;margin-top:14px;}
         @media (max-width:640px){
           /* 16px 以上可避免 iOS 聚焦时自动放大页面 */
           #authGate input{font-size:16px;padding:12px;}
           #authGate .card{padding:30px 24px 24px;}
           #authGate h1{font-size:20px;}
         }
-        #authGate .out{position:fixed;right:16px;bottom:14px;font-size:12px;color:#9a9184;
-          text-decoration:underline;cursor:pointer;background:none;border:none;}
+        #authGate .out{position:fixed;right:16px;bottom:14px;font-size:12px;color:#8ba0ad;
+          text-decoration:underline;cursor:pointer;background:none;border:none;width:auto;padding:0;
+          letter-spacing:0;font-weight:400;box-shadow:none;}
       </style>
       <div class="card">
         <h1>MONIAN</h1>

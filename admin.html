@@ -6,35 +6,38 @@
 <meta name="robots" content="noindex,nofollow">
 <title>Monian · 账号管理</title>
 <style>
-  :root{--bg:#f4f2ee;--card:#fff;--ink:#1d1a15;--sub:#8b8275;--line:#e4ddd0;--accent:#9a7434;}
+  :root{--bg:#eef3f5;--card:rgba(255,255,255,.92);--ink:#1d2e37;--sub:#5c7280;--line:rgba(60,88,104,.14);--accent:#337f96;}
   *{box-sizing:border-box;font-family:"PingFang SC","Microsoft YaHei",sans-serif;}
-  body{margin:0;background:linear-gradient(160deg,var(--bg),#ece8df);min-height:100vh;color:var(--ink);}
+  body{margin:0;min-height:100vh;color:var(--ink);
+    background:radial-gradient(60% 40% at 20% 12%,rgba(255,255,255,.9),transparent 62%),
+      radial-gradient(55% 38% at 82% 88%,rgba(180,213,228,.5),transparent 68%),
+      linear-gradient(158deg,#f3f8fa,#e7f0f5);}
   .wrap{max-width:720px;margin:0 auto;padding:36px 18px 60px;}
   h1{font-size:20px;letter-spacing:.3em;margin:0 0 4px;text-align:center;}
   .sub{text-align:center;font-size:12px;color:var(--sub);letter-spacing:.2em;margin-bottom:28px;}
   .card{background:var(--card);border-radius:14px;padding:24px 22px;box-shadow:0 10px 30px rgba(29,26,21,.08);margin-bottom:18px;}
   .card h2{font-size:15px;margin:0 0 14px;font-weight:600;}
   input,button{font-size:14px;}
-  input{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:#faf9f6;color:var(--ink);}
+  input{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:rgba(255,255,255,.92);color:var(--ink);}
   input:focus{outline:none;border-color:var(--accent);}
   .frow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
   .frow input{flex:1;min-width:120px;}
   button.b{border:none;border-radius:8px;padding:11px 18px;background:var(--accent);color:#fff;cursor:pointer;letter-spacing:.1em;}
   button.b:disabled{opacity:.5;cursor:default;}
   button.ghost{border:1px solid var(--line);background:#fff;color:var(--sub);border-radius:8px;padding:9px 14px;cursor:pointer;}
-  .msg{min-height:18px;font-size:12px;margin-top:8px;color:#b4433a;white-space:pre-wrap;}
+  .msg{min-height:18px;font-size:12px;margin-top:8px;color:#c0574f;white-space:pre-wrap;}
   .msg.ok{color:#4a7c46;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
   th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);}
   th{color:var(--sub);font-weight:500;font-size:12px;}
   td .mini{border:none;background:none;color:var(--accent);cursor:pointer;font-size:12px;text-decoration:underline;padding:0;margin-right:10px;}
-  td .mini.del{color:#b4433a;}
-  .exp-old{color:#b4433a;}
+  td .mini.del{color:#c0574f;}
+  .exp-old{color:#c0574f;}
   .hint{font-size:12px;color:var(--sub);line-height:1.7;}
   .hide{display:none;}
   label.ck{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub);}
   label.ck input{width:auto;}
-  select{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:#faf9f6;color:var(--ink);font-size:14px;}
+  select{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:rgba(255,255,255,.92);color:var(--ink);font-size:14px;}
   select:focus{outline:none;border-color:var(--accent);}
   .exp-preview{font-size:12px;color:var(--accent);margin-top:2px;}
   /* 改期小面板 */
@@ -47,9 +50,9 @@
   .devrow{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fcfbf8;}
   .devrow .dv1{font-weight:600;font-size:13px;display:flex;justify-content:space-between;}
   .devrow .dv1 .cnt{color:var(--sub);font-weight:400;}
-  .devrow .cnt.hot{color:#b4433a;}
+  .devrow .cnt.hot{color:#c0574f;}
   .devrow .dv2{font-size:12px;color:var(--sub);margin-top:3px;}
-  .devwarn{color:#b4433a;font-size:12px;margin:4px 0 8px;}
+  .devwarn{color:#c0574f;font-size:12px;margin:4px 0 8px;}
   #expDlg .box{background:#fff;border-radius:14px;padding:22px;width:min(340px,92vw);box-shadow:0 16px 44px rgba(29,26,21,.2);}
   #tokDlg{position:fixed;inset:0;z-index:50;background:rgba(29,26,21,.45);display:flex;align-items:center;justify-content:center;padding:16px;}
   #tokDlg.hide{display:none;}
@@ -69,17 +72,17 @@
     .mhead{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;cursor:pointer;gap:10px;}
     .mhead .mu{font-weight:600;font-size:14px;}
     .mhead .ms{font-size:12px;color:var(--sub);}
-    .mhead .ms.bad{color:#b4433a;}
+    .mhead .ms.bad{color:#c0574f;}
     .mhead .arrow{color:var(--sub);font-size:12px;transition:transform .15s;}
     .mcard.open .arrow{transform:rotate(180deg);}
     .mbody{display:none;border-top:1px dashed var(--line);padding:10px 14px 12px;}
     .mcard.open .mbody{display:block;}
     .mbody .mr{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;gap:10px;}
     .mbody .mr .k{color:var(--sub);font-size:12px;flex-shrink:0;}
-    .mbody .mr .bad{color:#b4433a;}
+    .mbody .mr .bad{color:#c0574f;}
     .mbody .macts{display:flex;flex-wrap:wrap;gap:8px;padding-top:8px;}
     .mbody .mini{flex:1 1 0;min-width:calc(33.33% - 6px);font-size:13px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:10px 6px;text-decoration:none;color:var(--accent);text-align:center;}
-    .mbody .mini.del{color:#b4433a;}
+    .mbody .mini.del{color:#c0574f;}
     .frow input,.frow select{flex:1 1 100%;}
   }
   @media (min-width:641px){
