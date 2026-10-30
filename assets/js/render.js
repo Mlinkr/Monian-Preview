@@ -11,8 +11,8 @@
   const MN = window.MN;
   const U = MN.util;
 
-  // 与示例图一致的衬线宋体；无衬线只作系统兜底
-  const FONT = '"Monian Serif","Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",serif';
+  // 与界面统一使用思源宋体（自托管子集 7896 字），无衬线只作系统兜底
+  const FONT = '"Monian Serif","Noto Serif SC","Source Han Serif SC","Songti SC","SimSun","STSong",serif';
   const CELL_ASPECT = 16 / 9;
 
   /* ---------------- 平滑缩放绘制 ---------------- */
