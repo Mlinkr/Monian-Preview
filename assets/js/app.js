@@ -1501,10 +1501,12 @@
   syncUI();
   scheduleRender();
 
-  // 衬线宋体加载完成后重绘，保证画布水印用上正确字形
+  // 思源宋体加载完成后重绘，保证画布水印用上正确字形
   if (document.fonts && document.fonts.load) {
-    document.fonts.load('600 20px "Monian Serif"').then(() => scheduleRender()).catch(() => {});
-    document.fonts.load('400 20px "Monian Serif"').then(() => scheduleRender()).catch(() => {});
+    const fam = '"Monian Serif"';
+    ['400', '500', '600', '700'].forEach((w) => {
+      document.fonts.load(`${w} 20px ${fam}`).then(() => scheduleRender()).catch(() => {});
+    });
     document.fonts.ready.then(() => scheduleRender()).catch(() => {});
   }
 

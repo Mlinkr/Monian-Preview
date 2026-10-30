@@ -36,6 +36,8 @@
     radial-gradient(90% 70% at 50% 0%,#f6fafc 0%,transparent 62%),
     radial-gradient(80% 60% at 78% 92%,#e2eef4 0%,transparent 68%),
     linear-gradient(168deg,#eef4f7 0%,#e7f0f5 48%,#eaf2f6 100%);
+  --font-serif:"Monian Serif","Noto Serif SC","Source Han Serif SC","Songti SC",serif;
+  --font-num:"Monian Serif","Noto Serif SC","Source Han Serif SC","Songti SC",serif;
   --safe-b:env(safe-area-inset-bottom,0px);
 }
 
@@ -46,7 +48,7 @@ body{
   margin:0;
   background:var(--bg);
   color:var(--txt);
-  font-family:"Monian Serif","Noto Serif SC","Source Han Serif SC","Songti SC",serif;
+  font-family:var(--font-serif);
   font-size:14px;
   line-height:1.55;
   -webkit-font-smoothing:antialiased;
@@ -56,7 +58,7 @@ body{
 button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
 h1,h2,h3,p{margin:0}
 code{
-  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-family:var(--font-num);font-variant-numeric:tabular-nums;
   font-size:.88em;
   background:rgba(51,127,150,.08);
   border:1px solid rgba(51,127,150,.16);
@@ -131,7 +133,7 @@ code{
 .card-bd{animation:foldIn .22s ease both}
 @keyframes foldIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .step{
-  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-family:var(--font-num);font-variant-numeric:tabular-nums;
   font-size:10px;color:var(--accent);
   border:1px solid rgba(51,127,150,.26);
   background:rgba(51,127,150,.06);
@@ -256,7 +258,7 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border:1.5px solid va
 .slider-row{display:flex;align-items:center;gap:10px;margin-top:8px}
 .slider-row label{font-size:12px;color:var(--dim);width:74px;flex:none}
 .slider-row output{
-  font-family:ui-monospace,Menlo,monospace;
+  font-family:var(--font-num);font-variant-numeric:tabular-nums;
   font-size:11px;color:var(--accent);width:46px;text-align:right;flex:none;
 }
 
@@ -315,7 +317,7 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border:1.5px solid va
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .thumb .no{
   position:absolute;left:3px;bottom:2px;font-size:9px;
-  font-family:ui-monospace,Menlo,monospace;
+  font-family:var(--font-num);font-variant-numeric:tabular-nums;
   color:rgba(255,255,255,.92);text-shadow:0 1px 3px rgba(0,0,0,.7);
 }
 .thumb button{
@@ -407,7 +409,7 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border:1.5px solid va
 .wm-pos-line input[type=range]{height:16px;flex:1}
 .wm-pos-line input[type=range]::-webkit-slider-thumb{width:11px;height:11px;margin-top:-4px}
 .wm-pos-line output{
-  font-family:ui-monospace,Menlo,monospace;font-size:10px;color:var(--dim);
+  font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:10px;color:var(--dim);
   width:34px;text-align:right;flex:none;
 }
 .wm-pos-reset{
@@ -451,7 +453,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:5px}
   background:var(--card-2);border:1px solid var(--line);border-radius:10px;padding:7px;
 }
 .tpl-preview img{width:54px;height:54px;object-fit:cover;border-radius:7px;flex:none}
-.tpl-preview-info{flex:1;font-size:11px;color:var(--dim-2);font-family:ui-monospace,Menlo,monospace}
+.tpl-preview-info{flex:1;font-size:11px;color:var(--dim-2);font-family:var(--font-num);font-variant-numeric:tabular-nums}
 .check{display:flex;align-items:center;gap:7px;margin-top:11px;font-size:11.5px;color:var(--dim);cursor:pointer}
 .check input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer}
 
@@ -483,7 +485,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:5px}
 .hs-line input[type=range]{flex:1;min-width:0;height:16px}
 .hs-line input[type=range]::-webkit-slider-thumb{width:11px;height:11px;margin-top:-4px}
 .hs-line output{
-  flex:none;width:40px;text-align:right;font-family:ui-monospace,Menlo,monospace;
+  flex:none;width:40px;text-align:right;font-family:var(--font-num);font-variant-numeric:tabular-nums;
   font-size:10px;color:var(--dim-2);
 }
 
@@ -522,7 +524,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:5px}
 .out-info{
   margin-top:11px;padding:9px 11px;border-radius:9px;
   background:rgba(45,72,86,.04);border:1px solid var(--line);
-  font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--dim);
+  font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:11px;color:var(--dim);
   display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;
 }
 .out-info b{color:var(--accent);font-weight:600}
@@ -603,7 +605,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:5px}
   padding:0 20px;gap:12px;
 }
 .stage-meta{
-  font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--dim-2);
+  font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:11px;color:var(--dim-2);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .stage-actions{display:flex;gap:8px;flex:none}
@@ -785,7 +787,7 @@ input[type=color]::-moz-color-swatch{border:none;border-radius:5px}
 .auto-row-tpl{display:flex;align-items:center;gap:6px;margin-top:5px}
 .aw-tpl-label{flex:none;font-size:10px;color:var(--dim-2)}
 .auto-row-tpl .aw-text{flex:1;min-width:0;padding:5px 8px;font-size:11px;border-radius:6px;
-  border:1px dashed var(--line-2);background:#fff;color:var(--dim-2);font-family:ui-monospace,Menlo,monospace}
+  border:1px dashed var(--line-2);background:#fff;color:var(--dim-2);font-family:var(--font-num);font-variant-numeric:tabular-nums}
 .auto-row-tpl .aw-text:focus{outline:none;border-color:rgba(51,127,150,.55);color:var(--ink)}
 
 /* 01 自定义位置 */
